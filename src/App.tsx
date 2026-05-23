@@ -12,6 +12,7 @@ export default function App() {
     "home" | "announcements" | "calendar" | "notifications"
   >("announcements");
   const [selectedAcademy, setSelectedAcademy] = useState("mentor");
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(2);
 
   if (!isAuthenticated) {
     return <AuthPage onLogin={() => setIsAuthenticated(true)} />;
@@ -22,7 +23,7 @@ export default function App() {
       <Navigation
         currentPage={currentPage}
         onNavigate={setCurrentPage}
-        unreadNotificationCount={2}
+        unreadNotificationCount={unreadNotificationCount}
       />
 
       {currentPage === "announcements" && (
@@ -39,7 +40,10 @@ export default function App() {
 
       {currentPage === "notifications" && (
         <div className="flex-1 overflow-auto">
-          <NotificationPage />
+          <NotificationPage
+              onUnreadCountChange={setUnreadNotificationCount}
+          />
+  
         </div>
       )}
 
