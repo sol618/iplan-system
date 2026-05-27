@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Megaphone, Pin, PenSquare, Trash2, Edit } from "lucide-react";
+import { Megaphone, Pin, PenSquare, Trash2, Edit, X } from "lucide-react";
 import { WriteAnnouncementModal } from "./write-announcement-modal";
 import { EditAnnouncementModal } from "./edit-announcement-modal";
 import { academies } from "./academy-tabs";
@@ -12,6 +12,12 @@ interface Announcement {
   isPinned?: boolean;
   author?: string;
   academyId: string;
+}
+
+interface NewAnnouncementInput {
+  title: string;
+  content: string;
+  isPinned: boolean;
 }
 
 const initialAnnouncements: Announcement[] = [
@@ -108,6 +114,15 @@ const initialAnnouncements: Announcement[] = [
   }
 ];
 
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 interface AnnouncementBoardProps {
   academyId: string;
 }
@@ -116,6 +131,7 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
 
   const academyAnnouncements = announcements.filter(a => a.academyId === academyId);
@@ -128,9 +144,29 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
 
   const currentAcademy = academies.find(a => a.id === academyId);
 
+  const handleCreateAnnouncement = (newAnnouncement: NewAnnouncementInput) => {
+    setAnnouncements(prev => {
+      const nextId = Math.max(0, ...prev.map(a => a.id)) + 1;
+
+      return [
+        {
+          id: nextId,
+          title: newAnnouncement.title,
+          content: newAnnouncement.content,
+          date: getTodayDateString(),
+          isPinned: newAnnouncement.isPinned,
+          author: currentAcademy?.name || "관리자",
+          academyId,
+        },
+        ...prev,
+      ];
+    });
+  };
+
   const handleDeleteAnnouncement = (id: number) => {
     if (confirm("정말 이 공지사항을 삭제하시겠습니까?")) {
       setAnnouncements(prev => prev.filter(a => a.id !== id));
+      setSelectedAnnouncement(prev => prev?.id === id ? null : prev);
     }
   };
 
@@ -168,6 +204,7 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         academyName={currentAcademy?.name || ""}
+        onSubmit={handleCreateAnnouncement}
       />
 
       {editingAnnouncement && (
@@ -191,6 +228,7 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
                 announcement={announcement}
                 onDelete={handleDeleteAnnouncement}
                 onEdit={handleEditAnnouncement}
+                onOpen={setSelectedAnnouncement}
               />
             ))}
           </div>
@@ -204,21 +242,50 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
                 announcement={announcement}
                 onDelete={handleDeleteAnnouncement}
                 onEdit={handleEditAnnouncement}
+                onOpen={setSelectedAnnouncement}
               />
             ))}
           </div>
         )}
       </div>
+
+      {selectedAnnouncement && (
+        <AnnouncementDetailModal
+          announcement={selectedAnnouncement}
+          onClose={() => setSelectedAnnouncement(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AnnouncementItem({ announcement, onDelete, onEdit }: { announcement: Announcement; onDelete: (id: number) => void; onEdit: (announcement: Announcement) => void }) {
+function AnnouncementItem({
+  announcement,
+  onDelete,
+  onEdit,
+  onOpen,
+}: {
+  announcement: Announcement;
+  onDelete: (id: number) => void;
+  onEdit: (announcement: Announcement) => void;
+  onOpen: (announcement: Announcement) => void;
+}) {
   return (
     <div
-      className={`p-5 rounded-lg border transition-colors hover:bg-accent/50 ${
+      onClick={() => onOpen(announcement)}
+      className={`p-5 rounded-lg border cursor-pointer transition-colors hover:bg-accent/50 ${
         announcement.isPinned ? "bg-accent border-primary/20" : "bg-card"
       }`}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.currentTarget !== e.target) return;
+
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(announcement);
+        }
+      }}
     >
       <div className="flex items-start justify-between gap-4 mb-3">
         <div className="flex items-center gap-2 flex-1">
@@ -236,14 +303,20 @@ function AnnouncementItem({ announcement, onDelete, onEdit }: { announcement: An
             })}
           </time>
           <button
-            onClick={() => onEdit(announcement)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(announcement);
+            }}
             className="p-2 hover:bg-accent text-muted-foreground hover:text-foreground rounded-lg transition-colors"
             title="공지 수정"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
-            onClick={() => onDelete(announcement.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(announcement.id);
+            }}
             className="p-2 hover:bg-accent text-muted-foreground hover:text-foreground rounded-lg transition-colors"
             title="공지 삭제"
           >
@@ -261,6 +334,65 @@ function AnnouncementItem({ announcement, onDelete, onEdit }: { announcement: An
           작성자: {announcement.author}
         </div>
       )}
+    </div>
+  );
+}
+
+function AnnouncementDetailModal({
+  announcement,
+  onClose,
+}: {
+  announcement: Announcement;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+      />
+
+      <article className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-card border rounded-lg shadow-lg">
+        <div className="sticky top-0 bg-card border-b px-6 py-4 flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {announcement.isPinned && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-primary">
+                  <Pin className="w-3.5 h-3.5" />
+                  상단 고정
+                </span>
+              )}
+              <time className="text-sm text-muted-foreground">
+                {new Date(announcement.date).toLocaleDateString("ko-KR", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </time>
+            </div>
+            <h2 className="leading-snug">{announcement.title}</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-accent rounded-lg transition-colors"
+            title="닫기"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          <p className="whitespace-pre-wrap leading-relaxed text-foreground/90">
+            {announcement.content}
+          </p>
+
+          {announcement.author && (
+            <div className="pt-4 border-t text-sm text-muted-foreground">
+              작성자: {announcement.author}
+            </div>
+          )}
+        </div>
+      </article>
     </div>
   );
 }
