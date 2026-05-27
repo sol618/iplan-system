@@ -38,18 +38,18 @@ const academyScheduleData: Record<string, AcademyScheduleData> = {
 interface AddAcademyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (schedules: {
-    dayOfWeek: number;
-    academyName: string;
-    startTime: string;
-    endTime: string;
-    childId: string;
-  }[]) => void;
+  children: { id: string; name: string }[];
+  onSave: (
+    schedules: { dayOfWeek: number; academyName: string; startTime: string; endTime: string; childId: string }[],
+    newChild?: { id: string; name: string }
+  ) => void;
 }
 
-export function AddAcademyModal({ isOpen, onClose, onSave }: AddAcademyModalProps) {
+export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcademyModalProps) {
+  const selectableChildren = children.filter(c => c.id !== "all");
+
   const [academyName, setAcademyName] = useState("");
-  const [childId, setChildId] = useState("child1");
+  const [childId, setChildId] = useState(() => selectableChildren[0]?.id ?? "child1");
   const [newChildName, setNewChildName] = useState("");
   const [isNewChild, setIsNewChild] = useState(false);
 
@@ -73,18 +73,21 @@ export function AddAcademyModal({ isOpen, onClose, onSave }: AddAcademyModalProp
       return;
     }
 
+    const newChildId = isNewChild ? `child${Date.now()}` : childId;
+    const newChild = isNewChild ? { id: newChildId, name: newChildName.trim() } : undefined;
+
     // 학원의 모든 일정을 선택한 자녀에게 추가
     const schedules = academyData.schedules.map(schedule => ({
       ...schedule,
       academyName: academyData.academyName,
-      childId: isNewChild ? `child${Date.now()}` : childId,
+      childId: newChildId,
     }));
 
-    onSave(schedules);
+    onSave(schedules, newChild);
 
     // Reset form
     setAcademyName("");
-    setChildId("child1");
+    setChildId(selectableChildren[0]?.id ?? "child1");
     setNewChildName("");
     setIsNewChild(false);
     onClose();
@@ -162,8 +165,9 @@ export function AddAcademyModal({ isOpen, onClose, onSave }: AddAcademyModalProp
               }}
               className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="child1">큰아이</option>
-              <option value="child2">둘째</option>
+              {selectableChildren.map(child => (
+                <option key={child.id} value={child.id}>{child.name}</option>
+              ))}
               <option value="new">새 자녀 추가</option>
             </select>
           </div>
