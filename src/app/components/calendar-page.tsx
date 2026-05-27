@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
 import { DayScheduleModal } from "./day-schedule-modal";
 import { EditScheduleModal } from "./edit-schedule-modal";
@@ -26,13 +26,13 @@ interface SpecialEvent {
   childId: string;
 }
 
-const children: Child[] = [
+const defaultChildren: Child[] = [
   { id: "all", name: "전체" },
   { id: "child1", name: "큰아이" },
   { id: "child2", name: "둘째" },
 ];
 
-const initialRegularSchedules: RegularSchedule[] = [
+const defaultRegularSchedules: RegularSchedule[] = [
   { dayOfWeek: 3, academyName: "예종피아노학원", startTime: "16:00", endTime: "19:00", childId: "child1" },
   { dayOfWeek: 4, academyName: "예종피아노학원", startTime: "16:00", endTime: "19:00", childId: "child1" },
   { dayOfWeek: 2, academyName: "멘토학원", startTime: "18:00", endTime: "21:00", childId: "child1" },
@@ -41,7 +41,7 @@ const initialRegularSchedules: RegularSchedule[] = [
   { dayOfWeek: 3, academyName: "태비태권도", startTime: "17:00", endTime: "19:00", childId: "child2" },
 ];
 
-const initialSpecialEvents: SpecialEvent[] = [
+const defaultSpecialEvents: SpecialEvent[] = [
   {
     date: "2026-04-12",
     title: "레벨테스트",
@@ -78,14 +78,36 @@ const initialSpecialEvents: SpecialEvent[] = [
 
 export function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // 2026년 4월
-  const [regularSchedules, setRegularSchedules] = useState<RegularSchedule[]>(initialRegularSchedules);
-  const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>(initialSpecialEvents);
+  const [children, setChildren] = useState<Child[]>(() => {
+    const saved = localStorage.getItem("iplan-children");
+    return saved ? JSON.parse(saved) : defaultChildren;
+  });
+  const [regularSchedules, setRegularSchedules] = useState<RegularSchedule[]>(() => {
+    const saved = localStorage.getItem("iplan-regularSchedules");
+    return saved ? JSON.parse(saved) : defaultRegularSchedules;
+  });
+  const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>(() => {
+    const saved = localStorage.getItem("iplan-specialEvents");
+    return saved ? JSON.parse(saved) : defaultSpecialEvents;
+  });
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [scheduleToEdit, setScheduleToEdit] = useState<any>(null);
   const [selectedChild, setSelectedChild] = useState<string>("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("iplan-children", JSON.stringify(children));
+  }, [children]);
+
+  useEffect(() => {
+    localStorage.setItem("iplan-regularSchedules", JSON.stringify(regularSchedules));
+  }, [regularSchedules]);
+
+  useEffect(() => {
+    localStorage.setItem("iplan-specialEvents", JSON.stringify(specialEvents));
+  }, [specialEvents]);
 
   const currentMonth = currentDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
 
@@ -178,8 +200,11 @@ export function CalendarPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleAddAcademy = (newSchedules: RegularSchedule[]) => {
+  const handleAddAcademy = (newSchedules: RegularSchedule[], newChild?: { id: string; name: string }) => {
     setRegularSchedules(prev => [...prev, ...newSchedules]);
+    if (newChild) {
+      setChildren(prev => [...prev, newChild]);
+    }
   };
 
   const handleSaveSchedule = (updatedSchedule: any) => {
@@ -431,6 +456,7 @@ export function CalendarPage() {
       <AddAcademyModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+        children={children}
         onSave={handleAddAcademy}
       />
 
