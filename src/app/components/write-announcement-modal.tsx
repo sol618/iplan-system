@@ -5,16 +5,27 @@ interface WriteAnnouncementModalProps {
   isOpen: boolean;
   onClose: () => void;
   academyName: string;
+  onSubmit: (announcement: {
+    title: string;
+    content: string;
+    isPinned: boolean;
+  }) => void;
 }
 
-export function WriteAnnouncementModal({ isOpen, onClose, academyName }: WriteAnnouncementModalProps) {
+export function WriteAnnouncementModal({ isOpen, onClose, academyName, onSubmit }: WriteAnnouncementModalProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isPinned, setIsPinned] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("공지 작성:", { title, content, isPinned, academyName });
+    if (!title.trim() || !content.trim()) return;
+
+    onSubmit({
+      title: title.trim(),
+      content: content.trim(),
+      isPinned,
+    });
     setTitle("");
     setContent("");
     setIsPinned(false);
@@ -32,7 +43,12 @@ export function WriteAnnouncementModal({ isOpen, onClose, academyName }: WriteAn
 
       <div className="relative w-full max-w-2xl bg-card border rounded-lg shadow-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-card border-b px-6 py-4 flex items-center justify-between">
-          <h2>공지사항 작성</h2>
+          <div>
+            <h2>공지사항 작성</h2>
+            {academyName && (
+              <p className="text-sm text-muted-foreground mt-1">{academyName}</p>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
