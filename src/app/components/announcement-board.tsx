@@ -125,9 +125,10 @@ function getTodayDateString() {
 
 interface AnnouncementBoardProps {
   academyId: string;
+  userType: "parent" | "academy";
 }
 
-export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
+export function AnnouncementBoard({ academyId, userType }: AnnouncementBoardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
@@ -189,13 +190,15 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
             <Megaphone className="w-6 h-6" />
             <h1>공지사항</h1>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-          >
-            <PenSquare className="w-5 h-5" />
-            <span>공지 작성</span>
-          </button>
+          {userType === "academy" && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+            >
+              <PenSquare className="w-5 h-5" />
+              <span>공지 작성</span>
+            </button>
+          )}
         </div>
         <p className="text-muted-foreground">학원의 주요 소식과 일정을 확인하세요</p>
       </div>
@@ -226,6 +229,7 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
               <AnnouncementItem
                 key={announcement.id}
                 announcement={announcement}
+                userType={userType}
                 onDelete={handleDeleteAnnouncement}
                 onEdit={handleEditAnnouncement}
                 onOpen={setSelectedAnnouncement}
@@ -240,6 +244,7 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
               <AnnouncementItem
                 key={announcement.id}
                 announcement={announcement}
+                userType={userType}
                 onDelete={handleDeleteAnnouncement}
                 onEdit={handleEditAnnouncement}
                 onOpen={setSelectedAnnouncement}
@@ -261,11 +266,13 @@ export function AnnouncementBoard({ academyId }: AnnouncementBoardProps) {
 
 function AnnouncementItem({
   announcement,
+  userType,
   onDelete,
   onEdit,
   onOpen,
 }: {
   announcement: Announcement;
+  userType: "parent" | "academy";
   onDelete: (id: number) => void;
   onEdit: (announcement: Announcement) => void;
   onOpen: (announcement: Announcement) => void;
@@ -302,26 +309,30 @@ function AnnouncementItem({
               day: 'numeric'
             })}
           </time>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(announcement);
-            }}
-            className="p-2 hover:bg-accent text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-            title="공지 수정"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(announcement.id);
-            }}
-            className="p-2 hover:bg-accent text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-            title="공지 삭제"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {userType === "academy" && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(announcement);
+                }}
+                className="p-2 hover:bg-accent text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+                title="공지 수정"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(announcement.id);
+                }}
+                className="p-2 hover:bg-accent text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+                title="공지 삭제"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

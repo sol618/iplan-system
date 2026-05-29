@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { BookOpen, HelpCircle, X } from "lucide-react";
 
-export function AuthPage ({onLogin}: {onLogin: () => void}) {
+// ── 가상 학부모 회원정보 DB (더미 데이터) ─────────────────────────
+const MOCK_PARENT_USERS = [
+  { name: "홍길동", userId: "parent123", phone: "01012345678", academy: "태비태권도", childName: "홍지우", password: "password123!" },
+  { name: "김철수", userId: "chulsoo456", phone: "01098765432", academy: "아이플랜어학원", childName: "김민재", password: "securePass1@" },
+  { name: "이영희", userId: "younghee789", phone: "01045678901", academy: "아이플랜수학학원", childName: "이서연", password: "myPassword3#" }
+];
+// ──────────────────────────────────────────────────────────────────
+
+export function AuthPage ({onLogin}: {onLogin: (userType: "parent" | "academy") => void}) {
   const [isLogin, setIsLogin] = useState(true);
   const [userType, setUserType] = useState<"parent" | "academy">("parent");
 
@@ -55,7 +63,7 @@ function ParentAuthForm({
 }: {
   isLogin: boolean;
   setIsLogin: (value: boolean) => void;
-  onLogin: () => void;
+  onLogin: (userType: "parent" | "academy") => void;
 }) {
   const [showHelp, setShowHelp] = useState(false);
   
@@ -67,25 +75,52 @@ function ParentAuthForm({
     academy: "",
     childName: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    loginError: ""
   });
 
   // 제출 시점에만 검증을 수행하는 핸들러
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    const form = e.currentTarget;
+    const userIdInput = form.querySelector("#userId") as HTMLInputElement;
+    const passwordInput = form.querySelector("#password") as HTMLInputElement;
+
     if (isLogin) {
-      onLogin();
+      let currentErrors = { name: "", userId: "", phone: "", academy: "", childName: "", password: "", confirmPassword: "", loginError: "" };
+      let isValid = true;
+
+      if (!userIdInput.value.trim()) {
+        currentErrors.userId = "아이디를 입력해 주세요.";
+        isValid = false;
+      }
+      if (!passwordInput.value) {
+        currentErrors.password = "비밀번호를 입력해 주세요.";
+        isValid = false;
+      }
+
+      if (isValid) {
+        const user = MOCK_PARENT_USERS.find(
+          (u) => u.userId === userIdInput.value && u.password === passwordInput.value
+        );
+        if (user) {
+          onLogin("parent");
+          return;
+        } else {
+          currentErrors.loginError = "아이디 또는 비밀번호가 일치하지 않습니다. 다시 확인해 주세요.";
+          isValid = false;
+        }
+      }
+      
+      setErrors(currentErrors);
       return;
     }
 
-    const form = e.currentTarget;
     const nameInput = form.querySelector("#name") as HTMLInputElement;
-    const userIdInput = form.querySelector("#userId") as HTMLInputElement;
     const phoneInput = form.querySelector("#phone") as HTMLInputElement;
     const academyInput = form.querySelector("#academyNameInput") as HTMLInputElement;
     const childNameInput = form.querySelector("#childName") as HTMLInputElement;
-    const passwordInput = form.querySelector("#password") as HTMLInputElement;
     const confirmPasswordInput = form.querySelector("#confirmPassword") as HTMLInputElement;
 
     // 1. 에러 객체 초기화
@@ -96,7 +131,8 @@ function ParentAuthForm({
       academy: "",
       childName: "",
       password: "",
-      confirmPassword: ""
+      confirmPassword: "",
+      loginError: ""
     };
     let isValid = true;
 
@@ -180,15 +216,19 @@ function ParentAuthForm({
 
     // 에러가 없을 때만 성공 콜백 함수 실행
     if (isValid) {
-      onLogin();
+      alert("회원가입이 완료되었습니다. 로그인해 주세요.");
+      setIsLogin(true);
+      form.reset();
     }
   };
 
   // 사용자가 다시 타이핑을 시작하면 해당 필드의 에러 표시를 실시간으로 지워주는 헬퍼
   const handleInputChange = (field: keyof typeof errors) => {
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
-    }
+    setErrors(prev => ({
+      ...prev,
+      [field]: "",
+      ...(field === "userId" || field === "password" ? { loginError: "" } : {})
+    }));
   };
 
   return (
@@ -313,6 +353,12 @@ function ParentAuthForm({
 
       {/* 브라우저 기본 말풍선 차단을 위해 noValidate 속성 유지 */}
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+        {isLogin && errors.loginError && (
+          <div className="border border-destructive bg-destructive/10 rounded-lg px-4 py-3 mb-4">
+            <p className="text-sm font-medium text-destructive">{errors.loginError}</p>
+          </div>
+        )}
+
         {!isLogin && (
           <div>
             <label htmlFor="name" className="block mb-3 text-lg font-medium text-foreground">
@@ -340,9 +386,9 @@ function ParentAuthForm({
             type="text"
             placeholder="myid123"
             onInput={() => handleInputChange("userId")}
-            className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${!isLogin && errors.userId ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
+            className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${errors.userId ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
           />
-          {!isLogin && errors.userId && (
+          {errors.userId && (
             <p className="mt-1.5 text-sm font-medium text-destructive">{errors.userId}</p>
           )}
         </div>
@@ -419,12 +465,12 @@ function ParentAuthForm({
             placeholder="••••••••"
             style={{ WebkitTextSecurity: "disc" } as React.CSSProperties}
             onInput={() => handleInputChange("password")}
-            className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${!isLogin && errors.password ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
+            className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${errors.password ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
           />
           {!isLogin && !errors.password && (
             <p className="mt-1.5 text-xs text-muted-foreground">영어, 숫자, 특수문자(!@#$% 등)를 사용하여 최소 6글자 이상 입력해 주세요.</p>
           )}
-          {!isLogin && errors.password && (
+          {errors.password && (
             <p className="mt-1.5 text-sm font-medium text-destructive">{errors.password}</p>
           )}
         </div>
@@ -471,7 +517,8 @@ function ParentAuthForm({
               academy: "",
               childName: "",
               password: "",
-              confirmPassword: ""
+              confirmPassword: "",
+              loginError: ""
             });
           }}
           className="text-lg text-muted-foreground hover:text-foreground transition-colors"
@@ -484,54 +531,259 @@ function ParentAuthForm({
   );
 }
 
-function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
+// ── 가상 학원 회원정보 DB (더미 데이터) ───────────────────────────
+const MOCK_ACADEMY_USERS = [
+  { academyName: "태비태권도", academyAddress: "서울시강남구테헤란로123", academyPhone: "0212345678", subjects: "태권도", managerName: "이관장", managerId: "academy123", managerPhone: "01011112222", password: "password123!" },
+  { academyName: "아이플랜어학원", academyAddress: "서울시서초구반포대로456", academyPhone: "0298765432", subjects: "영어", managerName: "김원장", managerId: "english456", managerPhone: "01033334444", password: "securePass1@" }
+];
+// ──────────────────────────────────────────────────────────────────
+
+// ── 가상 학원 인증 API (더미 데이터) ──────────────────────────────
+const MOCK_ACADEMY_API = [
+  { id: "acad-001", name: "태비태권도",       address: "서울시강남구테헤란로123",    phone: "0212345678"  },
+  { id: "acad-002", name: "아이플랜어학원",   address: "서울시서초구반포대로456",    phone: "0298765432"  },
+  { id: "acad-003", name: "아이플랜수학학원", address: "경기도성남시분당구판교로789", phone: "0317654321"  },
+  { id: "acad-004", name: "브레인영어학원",   address: "서울시마포구홍익로55",       phone: "0223456789"  },
+  { id: "acad-005", name: "스타과학학원",     address: "인천시남동구구월동100번길",  phone: "0321234567"  },
+];
+// ──────────────────────────────────────────────────────────────────
+
+function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "academy")=>void}) {
   const [isAcademyLogin, setIsAcademyLogin] = useState(true);
-  const [managerIdStatus, setManagerIdStatus] = useState<"idle" | "duplicated">("idle");
-  const [managerPasswordMatchStatus, setManagerPasswordMatchStatus] = useState<"idle" | "mismatch">("idle");
+
+  // 학원 정보 에러 state
+  const [acadErrors, setAcadErrors] = useState({
+    academyName: "",
+    academyAddress: "",
+    academyPhone: "",
+    subjects: "",
+    academyMatch: "",
+  });
+
+  // 등록자 정보 에러 state
+  const [regErrors, setRegErrors] = useState({
+    managerName: "",
+    managerId: "",
+    managerPhone: "",
+    managerPassword: "",
+    managerConfirmPassword: "",
+    loginError: "",
+  });
+
+  const handleAcadInputChange = (field: keyof typeof acadErrors) => {
+    if (acadErrors[field]) {
+      setAcadErrors(prev => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleRegInputChange = (field: keyof typeof regErrors) => {
+    setRegErrors(prev => ({
+      ...prev,
+      [field]: "",
+      ...(field === "managerId" || field === "managerPassword" ? { loginError: "" } : {})
+    }));
+  };
 
   const handleAcademySubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    const form = e.currentTarget;
+
     if (isAcademyLogin) {
-      onLogin();
+      const academyUserIdInput = form.querySelector("#academyUserId") as HTMLInputElement;
+      const academyPasswordInput = form.querySelector("#academyPassword") as HTMLInputElement;
+
+      let currentErrors = { managerName: "", managerId: "", managerPhone: "", managerPassword: "", managerConfirmPassword: "", loginError: "" };
+      let isValid = true;
+
+      if (!academyUserIdInput.value.trim()) {
+        currentErrors.managerId = "아이디를 입력해 주세요.";
+        isValid = false;
+      }
+      if (!academyPasswordInput.value) {
+        currentErrors.managerPassword = "비밀번호를 입력해 주세요.";
+        isValid = false;
+      }
+
+      if (isValid) {
+        const user = MOCK_ACADEMY_USERS.find(
+          (u) => u.managerId === academyUserIdInput.value && u.password === academyPasswordInput.value
+        );
+        if (user) {
+          onLogin("academy");
+          return;
+        } else {
+          currentErrors.loginError = "아이디 또는 비밀번호가 일치하지 않습니다. 다시 확인해 주세요.";
+          isValid = false;
+        }
+      }
+
+      setRegErrors(currentErrors);
       return;
     }
 
-    const form = e.currentTarget;
-    const managerIdInput = form.querySelector("#managerUserId") as HTMLInputElement;
-    const managerPasswordInput = form.querySelector("#managerPassword") as HTMLInputElement;
-    const managerConfirmInput = form.querySelector("#managerConfirmPassword") as HTMLInputElement;
+    const managerNameInput   = form.querySelector("#managerName")            as HTMLInputElement;
+    const managerIdInput     = form.querySelector("#managerUserId")          as HTMLInputElement;
+    const managerPhoneInput  = form.querySelector("#managerPhone")           as HTMLInputElement;
+    const managerPwInput     = form.querySelector("#managerPassword")        as HTMLInputElement;
+    const managerCfmPwInput  = form.querySelector("#managerConfirmPassword") as HTMLInputElement;
 
+    const academyNameInput  = form.querySelector("#academyAddressInput") as HTMLInputElement;
+    const academyAddrInput  = form.querySelector("#academyAddress")      as HTMLInputElement;
+    const academyPhoneInput = form.querySelector("#academyPhone")        as HTMLInputElement;
+    const subjectsInput     = form.querySelector("#subjects")            as HTMLInputElement;
+
+    // ── 학원 정보 섹션 검증 ──
+    let acadCurrentErrors = {
+      academyName: "",
+      academyAddress: "",
+      academyPhone: "",
+      subjects: "",
+      academyMatch: "",
+    };
+    let acadValid = true;
+
+    // 1. 빈칸 오류
+    if (!academyNameInput.value.trim()) {
+      acadCurrentErrors.academyName = "학원명을 입력해 주세요.";
+      acadValid = false;
+    } else if (academyNameInput.value.trim().length < 2) {
+      // 2. 범위: 최소 2자 이상
+      acadCurrentErrors.academyName = "학원명은 최소 2글자 이상 입력해 주세요.";
+      acadValid = false;
+    } else if (/[ㄱ-ㅎㅏ-ㅣ]/.test(academyNameInput.value)) {
+      // 3. 단일 자모(ㅇㅇ 등) 포함 불가 — 등록자 이름과 동일한 범위 조건
+      acadCurrentErrors.academyName = "학원명은 올바른 형식으로 입력해 주세요. (예: 아이플랜학원)";
+      acadValid = false;
+    }
+
+    if (!academyAddrInput.value.trim()) {
+      acadCurrentErrors.academyAddress = "주소를 입력해 주세요.";
+      acadValid = false;
+    } else if (academyAddrInput.value.trim().length < 5) {
+      acadCurrentErrors.academyAddress = "주소는 최소 5글자 이상 입력해 주세요.";
+      acadValid = false;
+    } else if (/[ㄱ-ㅎㅏ-ㅣ]/.test(academyAddrInput.value)) {
+      // 자모 단독 입력(ㅇㅇ 등) 거부 — 등록자 이름과 동일한 범위 조건
+      acadCurrentErrors.academyAddress = "주소는 올바른 형식으로 입력해 주세요. (예: 서울시 강남구 테헤란로 123)";
+      acadValid = false;
+    } else if (/[!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?]/.test(academyAddrInput.value)) {
+      acadCurrentErrors.academyAddress = "주소에 특수문자는 입력할 수 없습니다.";
+      acadValid = false;
+    }
+
+    if (!academyPhoneInput.value.trim()) {
+      acadCurrentErrors.academyPhone = "학원 전화번호를 입력해 주세요.";
+      acadValid = false;
+    } else if (!/^[0-9\-]+$/.test(academyPhoneInput.value)) {
+      acadCurrentErrors.academyPhone = "전화번호는 숫자와 하이픈(-)만 입력 가능합니다.";
+      acadValid = false;
+    } else if (academyPhoneInput.value.replace(/[^0-9]/g, "").length < 8) {
+      acadCurrentErrors.academyPhone = "전화번호가 너무 짧습니다. 올바른 번호를 입력해 주세요.";
+      acadValid = false;
+    }
+
+    if (!subjectsInput.value.trim()) {
+      acadCurrentErrors.subjects = "교육 과목을 입력해 주세요.";
+      acadValid = false;
+    } else if (subjectsInput.value.trim().length < 2) {
+      acadCurrentErrors.subjects = "교육 과목은 최소 2글자 이상 입력해 주세요.";
+      acadValid = false;
+    } else if (/[0-9]/.test(subjectsInput.value)) {
+      acadCurrentErrors.subjects = "교육 과목에 숫자는 입력할 수 없습니다.";
+      acadValid = false;
+    }
+
+    // 5·6. 학원 인증 API 일치 확인 (공백 제거 후 비교)
+    if (acadValid) {
+      const normalize = (s: string) => s.replace(/\s+/g, "");
+      const inputName  = normalize(academyNameInput.value);
+      const inputAddr  = normalize(academyAddrInput.value);
+      const inputPhone = normalize(academyPhoneInput.value).replace(/-/g, "");
+
+      const matched = MOCK_ACADEMY_API.find(
+        (acad) =>
+          normalize(acad.name)    === inputName &&
+          normalize(acad.address) === inputAddr &&
+          acad.phone              === inputPhone
+      );
+
+      if (!matched) {
+        acadCurrentErrors.academyMatch = "입력하신 학원 정보가 등록된 정보와 일치하지 않습니다. 학원명, 주소, 전화번호를 다시 확인해 주세요.";
+        acadValid = false;
+      }
+    }
+
+    setAcadErrors(acadCurrentErrors);
+
+    if (!acadValid) return;
+
+    let currentErrors = {
+      managerName: "",
+      managerId: "",
+      managerPhone: "",
+      managerPassword: "",
+      managerConfirmPassword: "",
+      loginError: "",
+    };
     let isValid = true;
-    managerIdInput.setCustomValidity("");
-    managerPasswordInput.setCustomValidity("");
-    managerConfirmInput.setCustomValidity("");
 
-    setManagerIdStatus("idle");
-    setManagerPasswordMatchStatus("idle");
-
-    const MOCK_DUPLICATE_IDS = ["admin", "test", "user1", "iplan"];
-    if (MOCK_DUPLICATE_IDS.includes(managerIdInput.value.toLowerCase())) {
-      setManagerIdStatus("duplicated");
-      managerIdInput.setCustomValidity("중복된 아이디 입니다.");
+    if (!managerNameInput.value.trim()) {
+      currentErrors.managerName = "담당자 이름을 입력해 주세요.";
+      isValid = false;
+    } else if (!/^[가-힣a-zA-Z]+$/.test(managerNameInput.value)) {
+      currentErrors.managerName = "이름은 한글 또는 영문으로만 입력해 주세요.";
       isValid = false;
     }
 
-    if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(managerPasswordInput.value)) {
-      managerPasswordInput.setCustomValidity("담당자 비밀번호에 한글이 입력되었습니다. 영어로 입력해 주세요.");
+    const MOCK_DUPLICATE_IDS = ["admin123", "test1234", "user123", "iplan123", "admin123", "test123", "manager1", "academy1"];
+    if (!managerIdInput.value.trim()) {
+      currentErrors.managerId = "아이디를 입력해 주세요.";
+      isValid = false;
+    } else if (managerIdInput.value.length < 6) {
+      currentErrors.managerId = "최소 6글자 이상 입력해 주세요.";
+      isValid = false;
+    } else if (!/^[A-Za-z0-9]+$/.test(managerIdInput.value)) {
+      currentErrors.managerId = "아이디는 영문, 숫자만 입력 가능합니다.";
+      isValid = false;
+    } else if (MOCK_DUPLICATE_IDS.includes(managerIdInput.value.toLowerCase())) {
+      currentErrors.managerId = "중복된 아이디 입니다.";
       isValid = false;
     }
 
-    if (managerPasswordInput.value !== managerConfirmInput.value) {
-      setManagerPasswordMatchStatus("mismatch");
-      managerConfirmInput.setCustomValidity("비밀번호가 일치하지 않습니다.");
+    if (!managerPhoneInput.value.trim()) {
+      currentErrors.managerPhone = "연락처를 입력해 주세요.";
+      isValid = false;
+    } else if (!/^\d{11}$/.test(managerPhoneInput.value)) {
+      currentErrors.managerPhone = "올바른 휴대폰 번호 11자리를 입력해 주세요.";
       isValid = false;
     }
 
-    if (!form.checkValidity() || !isValid) {
-      form.reportValidity();
-    } else {
-      onLogin();
+    if (!managerPwInput.value) {
+      currentErrors.managerPassword = "비밀번호를 입력해 주세요.";
+      isValid = false;
+    } else if (managerPwInput.value.length < 6) {
+      currentErrors.managerPassword = "최소 6글자 이상 입력해 주세요.";
+      isValid = false;
+    } else if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(managerPwInput.value)) {
+      currentErrors.managerPassword = "한글은 입력할 수 없습니다. 영어로 입력해 주세요.";
+      isValid = false;
+    }
+
+    if (!managerCfmPwInput.value) {
+      currentErrors.managerConfirmPassword = "비밀번호 확인을 입력해 주세요.";
+      isValid = false;
+    } else if (managerPwInput.value !== managerCfmPwInput.value) {
+      currentErrors.managerConfirmPassword = "비밀번호가 일치하지 않습니다.";
+      isValid = false;
+    }
+
+    setRegErrors(currentErrors);
+
+    if (isValid) {
+      alert("학원 등록이 완료되었습니다. 로그인해 주세요.");
+      setIsAcademyLogin(true);
+      form.reset();
     }
   };
 
@@ -547,7 +799,12 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
       </div>
 
       {isAcademyLogin ? (
-        <form className="space-y-4" onSubmit={handleAcademySubmit}>
+        <form className="space-y-4" onSubmit={handleAcademySubmit} noValidate>
+          {regErrors.loginError && (
+            <div className="border border-destructive bg-destructive/10 rounded-lg px-4 py-3 mb-4">
+              <p className="text-sm font-medium text-destructive">{regErrors.loginError}</p>
+            </div>
+          )}
           <div>
             <label htmlFor="academyUserId" className="block mb-3 text-lg font-medium text-foreground">
               아이디
@@ -556,8 +813,12 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
               id="academyUserId"
               type="text"
               placeholder="myid123"
-              className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              onInput={() => handleRegInputChange("managerId")}
+              className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${regErrors.managerId ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
             />
+            {regErrors.managerId && (
+              <p className="mt-1.5 text-sm font-medium text-destructive">{regErrors.managerId}</p>
+            )}
           </div>
 
           <div>
@@ -572,8 +833,12 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
               type="text"
               placeholder="••••••••"
               style={{ WebkitTextSecurity: "disc" } as React.CSSProperties}
-              className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              onInput={() => handleRegInputChange("managerPassword")}
+              className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${regErrors.managerPassword ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
             />
+            {regErrors.managerPassword && (
+              <p className="mt-1.5 text-sm font-medium text-destructive">{regErrors.managerPassword}</p>
+            )}
           </div>
 
           <button
@@ -584,10 +849,18 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
           </button>
         </form>
       ) : (
-        <form className="space-y-6" onSubmit={handleAcademySubmit}>
+        <form className="space-y-6" onSubmit={handleAcademySubmit} noValidate>
           <div className="space-y-4">
             <h2 className="text-foreground">학원 정보</h2>
 
+            {/* 학원 인증 불일치 공통 오류 */}
+            {acadErrors.academyMatch && (
+              <div className="border border-destructive bg-destructive/10 rounded-lg px-4 py-3">
+                <p className="text-sm font-medium text-destructive">{acadErrors.academyMatch}</p>
+              </div>
+            )}
+
+            {/* 학원명 */}
             <div>
               <label htmlFor="academyAddressInput" className="block mb-3 text-lg font-medium text-foreground">
                 학원명 <span className="text-destructive">*</span>
@@ -596,11 +869,15 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
                 id="academyAddressInput"
                 type="text"
                 placeholder="OO학원"
-                required
-                className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                onInput={() => handleAcadInputChange("academyName")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${acadErrors.academyName ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {acadErrors.academyName && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{acadErrors.academyName}</p>
+              )}
             </div>
 
+            {/* 주소 */}
             <div>
               <label htmlFor="academyAddress" className="block mb-3 text-lg font-medium text-foreground">
                 주소 <span className="text-destructive">*</span>
@@ -609,11 +886,15 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
                 id="academyAddress"
                 type="text"
                 placeholder="서울시 강남구 테헤란로 123"
-                required
-                className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                onInput={() => handleAcadInputChange("academyAddress")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${acadErrors.academyAddress ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {acadErrors.academyAddress && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{acadErrors.academyAddress}</p>
+              )}
             </div>
 
+            {/* 학원 전화번호 */}
             <div>
               <label htmlFor="academyPhone" className="block mb-3 text-lg font-medium text-foreground">
                 학원 전화번호 <span className="text-destructive">*</span>
@@ -622,21 +903,32 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
                 id="academyPhone"
                 type="tel"
                 placeholder="02-1234-5678"
-                required
-                className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                onInput={() => handleAcadInputChange("academyPhone")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${acadErrors.academyPhone ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {!acadErrors.academyPhone && (
+                <p className="mt-1.5 text-xs text-muted-foreground">예: 0212345678</p>
+              )}
+              {acadErrors.academyPhone && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{acadErrors.academyPhone}</p>
+              )}
             </div>
 
+            {/* 교육 과목 */}
             <div>
               <label htmlFor="subjects" className="block mb-3 text-lg font-medium text-foreground">
-                교육 과목
+                교육 과목 <span className="text-destructive">*</span>
               </label>
               <input
                 id="subjects"
                 type="text"
                 placeholder="수학, 영어, 과학"
-                className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                onInput={() => handleAcadInputChange("subjects")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${acadErrors.subjects ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {acadErrors.subjects && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{acadErrors.subjects}</p>
+              )}
             </div>
           </div>
 
@@ -651,9 +943,12 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
                 id="managerName"
                 type="text"
                 placeholder="홍길동"
-                required
-                className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                onInput={() => handleRegInputChange("managerName")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${regErrors.managerName ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {regErrors.managerName && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{regErrors.managerName}</p>
+              )}
             </div>
 
             <div>
@@ -664,11 +959,11 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
                 id="managerUserId"
                 type="text"
                 placeholder="myid123"
-                required
-                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${managerIdStatus === "duplicated" ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
+                onInput={() => handleRegInputChange("managerId")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${regErrors.managerId ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
-              {managerIdStatus === "duplicated" && (
-                <p className="mt-1.5 text-sm font-medium text-destructive">중복된 아이디 입니다</p>
+              {regErrors.managerId && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{regErrors.managerId}</p>
               )}
             </div>
 
@@ -679,10 +974,17 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
               <input
                 id="managerPhone"
                 type="tel"
-                placeholder="010-1234-5678"
-                required
-                className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                placeholder="01012345678"
+                maxLength={11}
+                onInput={() => handleRegInputChange("managerPhone")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${regErrors.managerPhone ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {!regErrors.managerPhone && (
+                <p className="mt-1.5 text-xs text-muted-foreground">기호 없이 숫자 11자리를 입력해 주세요. (예: 01012345678)</p>
+              )}
+              {regErrors.managerPhone && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{regErrors.managerPhone}</p>
+              )}
             </div>
 
             <div>
@@ -696,10 +998,16 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
                 id="managerPassword"
                 type="text"
                 placeholder="••••••••"
-                required
                 style={{ WebkitTextSecurity: "disc" } as React.CSSProperties}
-                className="w-full px-5 py-4 text-lg bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                onInput={() => handleRegInputChange("managerPassword")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${regErrors.managerPassword ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {!regErrors.managerPassword && (
+                <p className="mt-1.5 text-xs text-muted-foreground">영어, 숫자, 특수문자(!@#$% 등)를 사용하여 최소 6글자 이상 입력해 주세요.</p>
+              )}
+              {regErrors.managerPassword && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{regErrors.managerPassword}</p>
+              )}
             </div>
 
             <div>
@@ -713,12 +1021,12 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
                 id="managerConfirmPassword"
                 type="text"
                 placeholder="••••••••"
-                required
                 style={{ WebkitTextSecurity: "disc" } as React.CSSProperties}
-                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${managerPasswordMatchStatus === "mismatch" ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
+                onInput={() => handleRegInputChange("managerConfirmPassword")}
+                className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${regErrors.managerConfirmPassword ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
-              {managerPasswordMatchStatus === "mismatch" && (
-                <p className="mt-1.5 text-sm font-medium text-destructive">비밀번호가 일치하지 않습니다</p>
+              {regErrors.managerConfirmPassword && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{regErrors.managerConfirmPassword}</p>
               )}
             </div>
           </div>
@@ -737,8 +1045,21 @@ function AcademyRegistrationForm({onLogin}:{onLogin:()=>void}) {
           type="button"
           onClick={() => {
             setIsAcademyLogin(!isAcademyLogin);
-            setManagerIdStatus("idle");
-            setManagerPasswordMatchStatus("idle");
+            setAcadErrors({
+              academyName: "",
+              academyAddress: "",
+              academyPhone: "",
+              subjects: "",
+              academyMatch: "",
+            });
+            setRegErrors({
+              managerName: "",
+              managerId: "",
+              managerPhone: "",
+              managerPassword: "",
+              managerConfirmPassword: "",
+              loginError: "",
+            });
           }}
           className="text-lg text-muted-foreground hover:text-foreground transition-colors"
         >

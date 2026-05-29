@@ -8,6 +8,7 @@ import { AuthPage } from "./app/components/auth-page.js";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userType, setUserType] = useState<"parent" | "academy">("parent");
   const [currentPage, setCurrentPage] = useState<
     "home" | "announcements" | "calendar" | "notifications"
   >("announcements");
@@ -15,7 +16,7 @@ export default function App() {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(2);
 
   if (!isAuthenticated) {
-    return <AuthPage onLogin={() => setIsAuthenticated(true)} />;
+    return <AuthPage onLogin={(type) => { setUserType(type); setIsAuthenticated(true); }} />;
   }
 
   return (
@@ -33,7 +34,7 @@ export default function App() {
             onSelectAcademy={setSelectedAcademy}
           />
           <div className="flex-1 overflow-auto">
-            <AnnouncementBoard academyId={selectedAcademy} />
+            <AnnouncementBoard academyId={selectedAcademy} userType={userType} />
           </div>
         </>
       )}
