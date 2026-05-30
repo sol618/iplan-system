@@ -6,6 +6,7 @@ import { CalendarPage } from "./app/components/calendar-page.js";
 import { NotificationPage } from "./app/components/notification-page.js";
 import { AuthPage } from "./app/components/auth-page.js";
 
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userType, setUserType] = useState<"parent" | "academy">("parent");
@@ -31,10 +32,10 @@ export default function App() {
   return (
     <div className="size-full bg-background flex flex-col">
       <Navigation
-        currentPage={currentPage}
-        onNavigate={setCurrentPage}
-        unreadNotificationCount={unreadNotificationCount}
-      />
+  currentPage={currentPage}
+  onNavigate={setCurrentPage}
+  unreadNotificationCount={userType === "academy" ? 0 : unreadNotificationCount}
+/>
 
       {currentPage === "announcements" && (
         <>
@@ -54,13 +55,13 @@ export default function App() {
       )}
 
       {currentPage === "notifications" && (
-        <div className="flex-1 overflow-auto">
-          <NotificationPage
-              onUnreadCountChange={setUnreadNotificationCount}
-          />
-  
-        </div>
-      )}
+  <div className="flex-1 overflow-auto">
+    <NotificationPage
+      onUnreadCountChange={setUnreadNotificationCount}
+      userType={userType}
+    />
+  </div>
+)}
 
       {currentPage === "calendar" && (
         <div className="flex-1 overflow-auto">
