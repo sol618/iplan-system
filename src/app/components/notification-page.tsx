@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Bell, PenSquare, Check } from "lucide-react";
 
+
+
 interface Notification {
   id: number;
   senderName: string;
@@ -9,6 +11,7 @@ interface Notification {
   timestamp: string;
   isRead: boolean;
   childName?: string;
+  parentName?: string;
 }
 
 interface Academy {
@@ -48,7 +51,8 @@ const initialNotifications: Notification[] = [
     message: "이번 달 수강료 납부 안내입니다. 납부 기한은 5월 25일까지이며, 금액은 150,000원입니다.",
     timestamp: "2026-05-22T12:00:00",
     isRead: true,
-    childName: "둘째"
+    childName: "둘째",
+    parentName: "김서준 학부모"
   },
   {
     id: 4,
@@ -66,8 +70,19 @@ const initialNotifications: Notification[] = [
     message: "서준이 이번주 승급 심사있습니다! 금요일 수업 전까지 품새 3단 연습해오면 좋을 것 같습니다.^^",
     timestamp: "2026-04-09T16:45:00",
     isRead: true,
-    childName: "둘째"
+    childName: "둘째",
+    parentName: "김서준 학부모"
   },
+  {
+  id: 6,
+  senderName: "이준호 관장님",
+  academyName: "태비태권도",
+  message: "하은이가 오늘 발차기 자세를 아주 열심히 연습했습니다. 집에서도 많이 칭찬해 주세요.^^",
+  timestamp: "2026-05-25T18:30:00",
+  isRead: true,
+  childName: "하은이",
+  parentName: "이하은 학부모"
+},
 ];
 
 export function NotificationPage({
@@ -82,17 +97,26 @@ export function NotificationPage({
   const [selectedAcademy, setSelectedAcademy] = useState(
   userType === "academy" ? "taeby" : "mentor"
   );
+  const [selectedParent, setSelectedParent] = useState("김서준 학부모");
   const [currentAcademyForModal, setCurrentAcademyForModal] = useState("");
 
-  const filteredNotifications = notifications.filter(
-    n => n.academyName === academies.find(a => a.id === selectedAcademy)?.name
+  const filteredNotifications = notifications.filter((n) => {
+  if (userType === "academy") {
+    return n.parentName === selectedParent;
+  }
+
+  return (
+    n.academyName === academies.find(a => a.id === selectedAcademy)?.name &&
+    n.childName !== "하은이"
   );
+});
 
   const unreadCount = filteredNotifications.filter(n => !n.isRead).length;
   const totalUnreadCount = notifications.filter(n => !n.isRead).length;
   useEffect(() => {
   onUnreadCountChange(totalUnreadCount);
 }, [totalUnreadCount, onUnreadCountChange]);
+
 
   const handleMarkAsRead = (id: number) => {
     setNotifications(prev =>
@@ -143,38 +167,69 @@ export function NotificationPage({
   ? "새 알림을 작성하세요"
   : "선생님으로부터 받은 알림을 확인하세요"}</p>
       </div>
+      
 
-    {userType === "parent" && (
-      <div className="mb-6 border-b">
-        <div className="flex gap-1">
-          {academies.map((academy) => {
-            const unread = getUnreadCountByAcademy(academy.name);
-            return (
-              <button
-                key={academy.id}
-                onClick={() => setSelectedAcademy(academy.id)}
-                className={`px-6 py-3 whitespace-nowrap transition-colors border-b-2 ${
-                  selectedAcademy === academy.id
-                    ? "border-primary text-primary font-medium"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {academy.name}
-                {userType === "parent" && unread > 0 && (
-                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">
-                    {unread}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className="mb-6 border-b">
+  <div className="flex gap-1">
+    {userType === "parent" ? (
+      academies.map((academy) => {
+        const unread = getUnreadCountByAcademy(academy.name);
+        return (
+          <button
+            key={academy.id}
+            onClick={() => setSelectedAcademy(academy.id)}
+            className={`px-6 py-3 whitespace-nowrap transition-colors border-b-2 ${
+              selectedAcademy === academy.id
+                ? "border-primary text-primary font-medium"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {academy.name}
+            {unread > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                {unread}
+              </span>
+            )}
+          </button>
+        );
+      })
+    ) : (
+      <>
+        <button
+  onClick={() => setSelectedParent("김서준 학부모")}
+  className={`px-6 py-3 border-b-2 ${
+    selectedParent === "김서준 학부모"
+      ? "border-primary text-primary font-medium"
+      : "border-transparent text-muted-foreground"
+  }`}
+>
+  김서준 학부모
+</button>
+
+<button
+  onClick={() => setSelectedParent("이하은 학부모")}
+  className={`px-6 py-3 border-b-2 ${
+    selectedParent === "이하은 학부모"
+      ? "border-primary text-primary font-medium"
+      : "border-transparent text-muted-foreground"
+  }`}
+>
+  이하은 학부모
+</button>
+      </>
     )}
+  </div>
+</div>
+
+    
 
       <div className="bg-card border rounded-lg" style={{ minHeight: '400px' }}>
         <div className="border-b px-4 py-3 flex items-center justify-between bg-accent/30">
-          <h3 className="font-medium">{academies.find(a => a.id === selectedAcademy)?.name}</h3>
+          <h3 className="font-medium">
+  {userType === "academy"
+    ? selectedParent
+    : academies.find(a => a.id === selectedAcademy)?.name}
+</h3>
           {userType === "parent" && unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
@@ -187,7 +242,10 @@ export function NotificationPage({
 
         <div className="p-4 space-y-4">
           {filteredNotifications.length > 0 ? (
-            [...filteredNotifications].reverse().map((notification, index, arr) => {
+            (userType === "academy"
+  ? filteredNotifications
+  : [...filteredNotifications].reverse()
+).map((notification, index, arr) => {
               const prevNotification = arr[index - 1];
               const currentDate = new Date(notification.timestamp).toLocaleDateString('ko-KR');
               const prevDate = prevNotification ? new Date(prevNotification.timestamp).toLocaleDateString('ko-KR') : null;
@@ -222,13 +280,14 @@ export function NotificationPage({
       </div>
 
       <WriteNotificationModal
-        isOpen={isWriteModalOpen}
-        onClose={() => setIsWriteModalOpen(false)}
-        academyName={currentAcademyForModal}
-        onSend={(newNotification) => {
-          setNotifications(prev => [newNotification, ...prev]);
-        }}
-      />
+  isOpen={isWriteModalOpen}
+  onClose={() => setIsWriteModalOpen(false)}
+  academyName={currentAcademyForModal}
+  selectedParent={selectedParent}
+  onSend={(newNotification) => {
+    setNotifications(prev => [...prev, newNotification]);
+  }}
+/>
     </div>
   );
 }
@@ -325,11 +384,13 @@ function WriteNotificationModal({
   isOpen,
   onClose,
   academyName,
+  selectedParent,
   onSend,
 }: {
   isOpen: boolean;
   onClose: () => void;
   academyName: string;
+  selectedParent: string;
   onSend: (notification: Notification) => void;
 }) {
   const [message, setMessage] = useState("");
@@ -360,7 +421,15 @@ function WriteNotificationModal({
       alert("알림을 받을 학부모를 선택해주세요.");
       return;
     }
+    if (!message.trim()) {
+  alert("알림 내용을 입력해주세요.");
+  return;
+}
 
+if (message.trim().length > 300) {
+  alert("알림 내용은 300자 이하로 작성해주세요.");
+  return;
+}
     const newNotification: Notification = {
   id: Date.now(),
   senderName: "태비태권도",
@@ -368,7 +437,13 @@ function WriteNotificationModal({
   message,
   timestamp: new Date().toISOString(),
   isRead: false,
-  childName: `${selectedParents.length}명에게 전송`,
+  parentName: selectedParents.includes("p2")
+  ? "이하은 학부모"
+  : "김서준 학부모",
+
+  childName: selectedParents.includes("p2")
+    ? "하은이"
+    : "서준이",
 };
 
 onSend(newNotification);
