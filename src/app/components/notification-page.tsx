@@ -401,6 +401,10 @@ function WriteNotificationModal({
   const [message, setMessage] = useState("");
   const [selectedParents, setSelectedParents] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [errors, setErrors] = useState({
+  parents: "",
+  message: "",
+});
 
   const handleToggleParent = (parentId: string) => {
     setSelectedParents(prev =>
@@ -422,19 +426,29 @@ function WriteNotificationModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (selectedParents.length === 0) {
-      alert("알림을 받을 학부모를 선택해주세요.");
-      return;
-    }
-    if (!message.trim()) {
-  alert("알림 내용을 입력해주세요.");
-  return;
+    const newErrors = {
+  parents: "",
+  message: "",
+};
+
+let isValid = true;
+
+if (selectedParents.length === 0) {
+  newErrors.parents = "알림을 받을 학부모를 선택해주세요.";
+  isValid = false;
 }
 
-if (message.trim().length > 300) {
-  alert("알림 내용은 300자 이하로 작성해주세요.");
-  return;
+if (!message.trim()) {
+  newErrors.message = "알림 내용을 입력해주세요.";
+  isValid = false;
+} else if (message.trim().length > 300) {
+  newErrors.message = "알림 내용은 300자 이하로 작성해주세요.";
+  isValid = false;
 }
+
+setErrors(newErrors);
+
+if (!isValid) return;
     const newNotification: Notification = {
   id: Date.now(),
   senderName: "태비태권도",
@@ -491,7 +505,11 @@ onSend(newNotification);
                 {selectAll ? "전체 해제" : "전체 선택"}
               </button>
             </div>
-            <div className="border border-border rounded-lg max-h-64 overflow-y-auto">
+            <div
+  className={`border rounded-lg max-h-64 overflow-y-auto ${
+    errors.parents ? "border-destructive" : "border-border"
+  }`}
+>
               {parentsList.map((parent) => (
                 <label
                   key={parent.id}
@@ -518,6 +536,11 @@ onSend(newNotification);
               ))}
             </div>
           </div>
+              {errors.parents && (
+  <p className="mt-1.5 text-sm font-medium text-destructive">
+    {errors.parents}
+  </p>
+)}
 
           <div>
             <label htmlFor="message" className="block mb-2">
@@ -529,9 +552,18 @@ onSend(newNotification);
               onChange={(e) => setMessage(e.target.value)}
               placeholder="학부모님께 전달할 메시지를 입력하세요"
               rows={6}
-              className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-              required
+              className={`w-full px-4 py-3 bg-input-background border rounded-lg resize-none focus:outline-none focus:ring-2 ${
+  errors.message
+    ? "border-destructive focus:ring-destructive"
+    : "border-border focus:ring-ring"
+}`}
+              
             />
+            {errors.message && (
+  <p className="mt-1.5 text-sm font-medium text-destructive">
+    {errors.message}
+  </p>
+)}
           </div>
 
           <div className="flex items-center gap-3 pt-4 border-t">
