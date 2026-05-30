@@ -72,6 +72,56 @@ const initialAnnouncements: Announcement[] = [
     academyId: "mentor"
   },
   {
+    id: 12,
+    title: "6월 승품·승단 심사 안내",
+    content: "6월 14일(토) 오전 10시에 승품·승단 심사가 진행됩니다. 응시 대상자는 담당 사범님께 개별 안내를 받으시기 바랍니다.",
+    date: "2026-05-20",
+    isPinned: true,
+    author: "태비태권도",
+    academyId: "taebee"
+  },
+  {
+    id: 13,
+    title: "여름방학 집중 태권도 캠프 모집",
+    content: "7월 28일부터 8월 8일까지 2주간 여름방학 집중 캠프를 운영합니다. 기초 체력 훈련 및 품새 집중 지도가 포함됩니다. 정원이 한정되어 있으니 빠른 신청 바랍니다.",
+    date: "2026-05-18",
+    author: "태비태권도",
+    academyId: "taebee"
+  },
+  {
+    id: 14,
+    title: "도복 및 호구 구매 안내",
+    content: "신규 등록 회원분들을 위한 도복 및 호구 단체 구매를 진행합니다. 필요하신 분들은 5월 30일까지 원무실에 신청해 주세요.",
+    date: "2026-05-15",
+    author: "태비태권도",
+    academyId: "taebee"
+  },
+  {
+    id: 15,
+    title: "원어민 회화 특강 개설",
+    content: "6월부터 매주 수·금요일 오후 5시에 원어민 강사와 함께하는 회화 특강이 개설됩니다. 수강 신청은 원무실로 문의 바랍니다.",
+    date: "2026-05-20",
+    isPinned: true,
+    author: "아이플랜어학원",
+    academyId: "iplan-english"
+  },
+  {
+    id: 16,
+    title: "중간고사 대비 특별 수업 일정",
+    content: "5월 26일부터 30일까지 중간고사 대비 특별 수업이 진행됩니다. 기존 수업 시간표와 상이하오니 개별 안내문을 확인해 주세요.",
+    date: "2026-05-18",
+    author: "아이플랜어학원",
+    academyId: "iplan-english"
+  },
+  {
+    id: 17,
+    title: "교재 변경 안내",
+    content: "6월부터 중등부 교재가 변경됩니다. 새 교재는 첫 수업 전날까지 원무실에서 수령하시기 바랍니다.",
+    date: "2026-05-15",
+    author: "아이플랜어학원",
+    academyId: "iplan-english"
+  },
+  {
     id: 7,
     title: "정기 연주회 안내",
     content: "5월 15일 오후 2시 학원 정기 연주회가 개최됩니다. 학부모님들의 많은 참석 부탁드립니다.",

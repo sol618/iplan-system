@@ -9,7 +9,7 @@ const MOCK_PARENT_USERS = [
 ];
 // ──────────────────────────────────────────────────────────────────
 
-export function AuthPage ({onLogin}: {onLogin: (userType: "parent" | "academy") => void}) {
+export function AuthPage ({onLogin}: {onLogin: (userType: "parent" | "academy", academyId?: string) => void}) {
   const [isLogin, setIsLogin] = useState(true);
   const [userType, setUserType] = useState<"parent" | "academy">("parent");
 
@@ -63,7 +63,7 @@ function ParentAuthForm({
 }: {
   isLogin: boolean;
   setIsLogin: (value: boolean) => void;
-  onLogin: (userType: "parent" | "academy") => void;
+  onLogin: (userType: "parent" | "academy", academyId?: string) => void;
 }) {
   const [showHelp, setShowHelp] = useState(false);
   
@@ -533,8 +533,8 @@ function ParentAuthForm({
 
 // ── 가상 학원 회원정보 DB (더미 데이터) ───────────────────────────
 const MOCK_ACADEMY_USERS = [
-  { academyName: "태비태권도", academyAddress: "서울시강남구테헤란로123", academyPhone: "0212345678", subjects: "태권도", managerName: "이관장", managerId: "academy123", managerPhone: "01011112222", password: "password123!" },
-  { academyName: "아이플랜어학원", academyAddress: "서울시서초구반포대로456", academyPhone: "0298765432", subjects: "영어", managerName: "김원장", managerId: "english456", managerPhone: "01033334444", password: "securePass1@" }
+  { academyName: "태비태권도", academyAddress: "서울시강남구테헤란로123", academyPhone: "0212345678", subjects: "태권도", managerName: "이관장", managerId: "academy123", managerPhone: "01011112222", password: "password123!", academyId: "taebee" },
+  { academyName: "아이플랜어학원", academyAddress: "서울시서초구반포대로456", academyPhone: "0298765432", subjects: "영어", managerName: "김원장", managerId: "english456", managerPhone: "01033334444", password: "securePass1@", academyId: "iplan-english" }
 ];
 // ──────────────────────────────────────────────────────────────────
 
@@ -548,7 +548,7 @@ const MOCK_ACADEMY_API = [
 ];
 // ──────────────────────────────────────────────────────────────────
 
-function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "academy")=>void}) {
+function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "academy", academyId?: string)=>void}) {
   const [isAcademyLogin, setIsAcademyLogin] = useState(true);
 
   // 학원 정보 에러 state
@@ -610,7 +610,7 @@ function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "acade
           (u) => u.managerId === academyUserIdInput.value && u.password === academyPasswordInput.value
         );
         if (user) {
-          onLogin("academy");
+          onLogin("academy", user.academyId);
           return;
         } else {
           currentErrors.loginError = "아이디 또는 비밀번호가 일치하지 않습니다. 다시 확인해 주세요.";

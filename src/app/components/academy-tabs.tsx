@@ -8,6 +8,8 @@ export interface Academy {
 export const academies: Academy[] = [
   { id: "mentor", name: "멘토학원" },
   { id: "yejong", name: "예종피아노학원" },
+  { id: "taebee", name: "태비태권도" },
+  { id: "iplan-english", name: "아이플랜어학원" },
 ];
 
 interface AcademyTabsProps {
