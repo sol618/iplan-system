@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
 interface Student {
-  id: string;   // "parentUserId|childId"
-  name: string; // "학부모(자녀)"
+  id: string;
+  name: string;
 }
 
 interface AddEventModalProps {
@@ -18,6 +18,11 @@ interface AddEventModalProps {
     title: string;
     description: string;
   }) => void;
+}
+
+function toMin(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
 }
 
 export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventModalProps) {
@@ -48,24 +53,12 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!studentId) { alert("학생을 선택해주세요."); return; }
+    if (!title.trim()) { alert("행사 제목을 입력해주세요."); return; }
+    if (!date) { alert("날짜를 선택해주세요."); return; }
 
-    if (!studentId) {
-      alert("학생을 선택해주세요.");
-      return;
-    }
-    if (!title.trim()) {
-      alert("행사 제목을 입력해주세요.");
-      return;
-    }
-    if (!date) {
-      alert("날짜를 선택해주세요.");
-      return;
-    }
-
-    const [sh, sm] = startTime.split(":").map(Number);
-    const [eh, em] = endTime.split(":").map(Number);
-    const start = sh * 60 + sm;
-    const end = eh * 60 + em;
+    const start = toMin(startTime);
+    const end = toMin(endTime);
     if (end <= start) {
       setTimeError("종료 시간이 시작 시간보다 이르거나 같을 수 없습니다.");
       return;
@@ -75,14 +68,7 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
       return;
     }
 
-    onSave({
-      studentId,
-      date,
-      startTime,
-      endTime,
-      title: title.trim(),
-      description: description.trim(),
-    });
+    onSave({ studentId, date, startTime, endTime, title: title.trim(), description: description.trim() });
     onClose();
   };
 
@@ -104,16 +90,10 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
           <div className="p-6 text-center text-muted-foreground">
             <p>등록된 학생이 없습니다.</p>
             <p className="text-sm mt-1">학부모가 이 학원을 캘린더에 등록해야 행사를 추가할 수 있습니다.</p>
-            <button
-              onClick={onClose}
-              className="mt-4 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors"
-            >
-              닫기
-            </button>
+            <button onClick={onClose} className="mt-4 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors">닫기</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* 학생 선택 */}
             <div>
               <label className="block mb-2">학생 선택</label>
               <select
@@ -127,7 +107,6 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
               </select>
             </div>
 
-            {/* 날짜 */}
             <div>
               <label className="block mb-2">날짜</label>
               <input
@@ -139,7 +118,6 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
               />
             </div>
 
-            {/* 시간 */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block mb-2">시작 시간</label>
@@ -162,11 +140,8 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
                 />
               </div>
             </div>
-            {timeError && (
-              <p className="text-sm text-destructive">{timeError}</p>
-            )}
+            {timeError && <p className="text-sm text-destructive">{timeError}</p>}
 
-            {/* 행사 제목 */}
             <div>
               <label className="block mb-2">행사 제목</label>
               <input
@@ -179,11 +154,9 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
               />
             </div>
 
-            {/* 내용 */}
             <div>
               <label className="block mb-2">
-                내용
-                <span className="ml-1 text-sm text-muted-foreground">(선택)</span>
+                내용 <span className="text-sm text-muted-foreground">(선택)</span>
               </label>
               <textarea
                 value={description}
@@ -195,19 +168,8 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
             </div>
 
             <div className="flex items-center gap-3 pt-4 border-t">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-2.5 border border-border rounded-lg hover:bg-accent transition-colors"
-              >
-                취소
-              </button>
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-              >
-                추가
-              </button>
+              <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 border border-border rounded-lg hover:bg-accent transition-colors">취소</button>
+              <button type="submit" className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">추가</button>
             </div>
           </form>
         )}

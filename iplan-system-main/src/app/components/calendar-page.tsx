@@ -20,6 +20,7 @@ interface RegularSchedule {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  exceptions?: string[]; // 이 날짜만 건너뜀 (예: ["2026-05-06"])
 }
 
 interface SpecialEvent {
@@ -211,7 +212,7 @@ export function CalendarPage({
   // ── 색상 ────────────────────────────────────────────────────────
   const getAcademyColor = (academyName: string, isSpecialEvent = false, childId?: string) => {
     if (isAcademy) {
-      return hashColor(childId ?? academyName, isSpecialEvent);
+      return hashColor(childId ?? academyName, false);
     }
     if (childId === "child2") {
       return isSpecialEvent
@@ -238,7 +239,9 @@ export function CalendarPage({
   };
 
   const handleEditSchedule = (schedule: any) => {
-    setScheduleToEdit(schedule);
+    // 클릭한 날짜를 함께 저장해 "이 날짜만" 수정에 사용
+    const specificDate = selectedDate ? toDateStr(selectedDate) : undefined;
+    setScheduleToEdit({ ...schedule, specificDate });
     setIsDayModalOpen(false);
     setIsEditModalOpen(true);
   };
@@ -322,17 +325,54 @@ export function CalendarPage({
   };
 
   const handleSaveSchedule = (updatedSchedule: any) => {
+    const { specificDate } = scheduleToEdit;
+
     if (updatedSchedule === null) {
+      // 삭제
       if (scheduleToEdit.type === "regular") {
-        setAllSchedules(prev => prev.filter(s => s.id !== scheduleToEdit.id));
+        if (specificDate) {
+          // 이 날짜만 삭제: exceptions에 추가해 해당 날짜만 건너뜀
+          setAllSchedules(prev => prev.map(s =>
+            s.id === scheduleToEdit.id
+              ? { ...s, exceptions: [...(s.exceptions ?? []), specificDate] }
+              : s
+          ));
+        } else {
+          setAllSchedules(prev => prev.filter(s => s.id !== scheduleToEdit.id));
+        }
       } else {
         setAllEvents(prev => prev.filter(e => e.id !== scheduleToEdit.id));
       }
     } else {
+      // 수정
       if (updatedSchedule.type === "regular") {
-        setAllSchedules(prev =>
-          prev.map(s => s.id === scheduleToEdit.id ? { ...s, ...updatedSchedule } : s)
-        );
+        if (specificDate) {
+          // 이 날짜만 수정:
+          // 1) 원래 정규 일정에 이 날짜를 exception으로 추가
+          setAllSchedules(prev => prev.map(s =>
+            s.id === scheduleToEdit.id
+              ? { ...s, exceptions: [...(s.exceptions ?? []), specificDate] }
+              : s
+          ));
+          // 2) 수정된 내용으로 이 날짜 한정 SpecialEvent 생성
+          const newEvent: SpecialEvent = {
+            id: makeId(),
+            parentUserId: scheduleToEdit.parentUserId,
+            parentName: scheduleToEdit.parentName,
+            childId: updatedSchedule.childId ?? scheduleToEdit.childId,
+            childName: scheduleToEdit.childName,
+            academyName: updatedSchedule.academyName ?? scheduleToEdit.academyName,
+            date: specificDate,
+            title: "정규 수업",
+            startTime: updatedSchedule.startTime,
+            endTime: updatedSchedule.endTime,
+          };
+          setAllEvents(prev => [...prev, newEvent]);
+        } else {
+          setAllSchedules(prev =>
+            prev.map(s => s.id === scheduleToEdit.id ? { ...s, ...updatedSchedule } : s)
+          );
+        }
       } else {
         setAllEvents(prev =>
           prev.map(e => e.id === scheduleToEdit.id ? { ...e, ...updatedSchedule } : e)
@@ -341,11 +381,16 @@ export function CalendarPage({
     }
   };
 
+  const toDateStr = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
   const getSchedulesForDate = (date: Date) => {
     const dayOfWeek = date.getDay();
-    const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const dateString = toDateStr(date);
     return {
-      regularSchedule: filteredRegularSchedules.filter(s => s.dayOfWeek === dayOfWeek),
+      regularSchedule: filteredRegularSchedules.filter(
+        s => s.dayOfWeek === dayOfWeek && !s.exceptions?.includes(dateString)
+      ),
       specialEvent: filteredSpecialEvents.filter(e => e.date === dateString),
     };
   };
