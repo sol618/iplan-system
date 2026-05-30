@@ -84,6 +84,7 @@ const initialNotifications: Notification[] = [
   parentName: "이하은 학부모"
 },
 ];
+let notificationMemory: Notification[] = initialNotifications;
 
 export function NotificationPage({
   onUnreadCountChange,
@@ -92,7 +93,7 @@ export function NotificationPage({
   onUnreadCountChange: (count: number) => void;
   userType: "parent" | "academy";
 }) {
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>(notificationMemory);
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
   const [selectedAcademy, setSelectedAcademy] = useState(
   userType === "academy" ? "taeby" : "mentor"
@@ -116,6 +117,10 @@ export function NotificationPage({
   useEffect(() => {
   onUnreadCountChange(totalUnreadCount);
 }, [totalUnreadCount, onUnreadCountChange]);
+
+useEffect(() => {
+  notificationMemory = notifications;
+}, [notifications]);
 
 
   const handleMarkAsRead = (id: number) => {
