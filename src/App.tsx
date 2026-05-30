@@ -8,6 +8,8 @@ import { AuthPage } from "./app/components/auth-page.js";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userType, setUserType] = useState<"parent" | "academy">("parent");
+  const [loggedInAcademyId, setLoggedInAcademyId] = useState<string | undefined>(undefined);
   const [currentPage, setCurrentPage] = useState<
     "home" | "announcements" | "calendar" | "notifications"
   >("announcements");
@@ -15,7 +17,15 @@ export default function App() {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(2);
 
   if (!isAuthenticated) {
-    return <AuthPage onLogin={() => setIsAuthenticated(true)} />;
+    return (
+      <AuthPage
+        onLogin={(type, academyId) => {
+          setUserType(type);
+          setLoggedInAcademyId(academyId);
+          setIsAuthenticated(true);
+        }}
+      />
+    );
   }
 
   return (
@@ -28,12 +38,17 @@ export default function App() {
 
       {currentPage === "announcements" && (
         <>
-          <AcademyTabs
-            selectedAcademy={selectedAcademy}
-            onSelectAcademy={setSelectedAcademy}
-          />
+          {userType === "parent" && (
+            <AcademyTabs
+              selectedAcademy={selectedAcademy}
+              onSelectAcademy={setSelectedAcademy}
+            />
+          )}
           <div className="flex-1 overflow-auto">
-            <AnnouncementBoard academyId={selectedAcademy} />
+            <AnnouncementBoard
+              academyId={userType === "academy" ? loggedInAcademyId! : selectedAcademy}
+              userType={userType}
+            />
           </div>
         </>
       )}
