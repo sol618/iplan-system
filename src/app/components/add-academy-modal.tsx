@@ -53,6 +53,7 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
   const [academyError, setAcademyError] = useState("");
   const [childId, setChildId] = useState(selectableChildren[0]?.id ?? "");
   const [newChildName, setNewChildName] = useState("");
+  const [childNameError, setChildNameError] = useState("");
   // 자녀가 없으면 처음부터 새 자녀 추가 모드로 시작
   const [isNewChild, setIsNewChild] = useState(selectableChildren.length === 0);
 
@@ -64,6 +65,7 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
       setAcademyError("");
       setChildId(fresh[0]?.id ?? "");
       setNewChildName("");
+      setChildNameError("");
       setIsNewChild(fresh.length === 0);
     }
   }, [isOpen]);
@@ -81,7 +83,7 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
     e.preventDefault();
 
     if (!trimmedName) {
-      setAcademyError("학원 이름을 입력해주세요.");
+      setAcademyError("학원 이름을 입력해 주세요.");
       return;
     }
 
@@ -91,7 +93,7 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
     }
 
     if (isNewChild && !newChildName.trim()) {
-      alert("자녀 이름을 입력해주세요.");
+      setChildNameError("자녀 이름을 입력해 주세요.");
       return;
     }
 
@@ -128,7 +130,7 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label htmlFor="academy-name" className="block mb-2">
-              학원 이름
+              학원 이름 <span className="text-destructive">*</span>
             </label>
             <input
               id="academy-name"
@@ -136,10 +138,10 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
               value={academyName}
               onChange={(e) => { setAcademyName(e.target.value); setAcademyError(""); }}
               placeholder="예: 멘토학원"
-              className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              className={`w-full px-4 py-2.5 bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${academyError ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
             />
             {academyError && (
-              <p className="text-sm text-destructive mt-1">{academyError}</p>
+              <p className="mt-1.5 text-sm font-medium text-destructive">{academyError}</p>
             )}
           </div>
 
@@ -183,16 +185,19 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
           {isNewChild && (
             <div>
               <label htmlFor="new-child-name" className="block mb-2">
-                자녀 이름
+                자녀 이름 <span className="text-destructive">*</span>
               </label>
               <input
                 id="new-child-name"
                 type="text"
                 value={newChildName}
-                onChange={(e) => setNewChildName(e.target.value)}
+                onChange={(e) => { setNewChildName(e.target.value); setChildNameError(""); }}
                 placeholder="예: 셋째"
-                className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                className={`w-full px-4 py-2.5 bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${childNameError ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
+              {childNameError && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{childNameError}</p>
+              )}
             </div>
           )}
 
