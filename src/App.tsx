@@ -11,6 +11,8 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userType, setUserType] = useState<"parent" | "academy">("parent");
   const [loggedInAcademyId, setLoggedInAcademyId] = useState<string | undefined>(undefined);
+  const [loggedInUserId, setLoggedInUserId] = useState<string | undefined>(undefined);
+  const [loggedInName, setLoggedInName] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<
     "home" | "announcements" | "calendar" | "notifications"
   >("announcements");
@@ -20,9 +22,11 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <AuthPage
-        onLogin={(type, academyId) => {
+        onLogin={(type, academyId, userId, name) => {
           setUserType(type);
           setLoggedInAcademyId(academyId);
+          setLoggedInUserId(userId);
+          setLoggedInName(name ?? "");
           setIsAuthenticated(true);
         }}
       />
@@ -65,7 +69,11 @@ export default function App() {
 
       {currentPage === "calendar" && (
         <div className="flex-1 overflow-auto">
-          <CalendarPage />
+          <CalendarPage
+            userId={loggedInUserId}
+            userType={userType}
+            displayName={loggedInName}
+          />
         </div>
       )}
     </div>

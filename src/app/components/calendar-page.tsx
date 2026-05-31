@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
 import { DayScheduleModal } from "./day-schedule-modal";
 import { EditScheduleModal } from "./edit-schedule-modal";
-import { AddAcademyModal } from "./add-academy-modal";
+import { AddAcademyModal, academyScheduleData } from "./add-academy-modal";
+import { AddEventModal } from "./add-event-modal";
 
 interface Child {
   id: string;
@@ -10,185 +11,227 @@ interface Child {
 }
 
 interface RegularSchedule {
-  dayOfWeek: number; // 0 = 일요일, 1 = 월요일, ...
+  id: string;
+  parentUserId: string;
+  parentName: string;
+  childId: string;
+  childName: string;
   academyName: string;
+  dayOfWeek: number;
   startTime: string;
   endTime: string;
-  childId: string;
 }
 
 interface SpecialEvent {
+  id: string;
+  parentUserId: string;
+  parentName: string;
+  childId: string;
+  childName: string;
+  academyName: string;
   date: string;
   title: string;
-  academyName: string;
   startTime: string;
   endTime: string;
-  childId: string;
+  description?: string;
 }
 
-const defaultChildren: Child[] = [
-  { id: "all", name: "전체" },
-  { id: "child1", name: "큰아이" },
-  { id: "child2", name: "둘째" },
+const GLOBAL_SCHEDULES_KEY = "iplan-global-schedules";
+const GLOBAL_EVENTS_KEY = "iplan-global-events";
+
+const DEFAULT_USERS = [
+  { userId: "parent123", name: "홍길동", childName: "홍지우", academy: "태비태권도" },
+  { userId: "chulsoo456", name: "김철수", childName: "김민재", academy: "아이플랜어학원" },
+  { userId: "younghee789", name: "이영희", childName: "이서연", academy: "아이플랜수학학원" },
 ];
 
-const defaultRegularSchedules: RegularSchedule[] = [
-  { dayOfWeek: 3, academyName: "예종피아노학원", startTime: "16:00", endTime: "19:00", childId: "child1" },
-  { dayOfWeek: 4, academyName: "예종피아노학원", startTime: "16:00", endTime: "19:00", childId: "child1" },
-  { dayOfWeek: 2, academyName: "멘토학원", startTime: "18:00", endTime: "21:00", childId: "child1" },
-  { dayOfWeek: 5, academyName: "멘토학원", startTime: "18:00", endTime: "21:00", childId: "child1" },
-  { dayOfWeek: 1, academyName: "태비태권도", startTime: "17:00", endTime: "19:00", childId: "child2" },
-  { dayOfWeek: 3, academyName: "태비태권도", startTime: "17:00", endTime: "19:00", childId: "child2" },
+function getRegistrationData(userId: string): { name: string; childName: string; academy: string } | null {
+  try {
+    const raw = localStorage.getItem("iplan-users");
+    const all: { userId: string; name: string; childName: string; academy: string }[] = raw
+      ? JSON.parse(raw)
+      : DEFAULT_USERS;
+    return all.find(u => u.userId === userId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function makeId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+const COLOR_PALETTE = [
+  { bg: "bg-sky-100/80 dark:bg-sky-900/20",     text: "text-sky-700 dark:text-sky-300",     border: "border-sky-200 dark:border-sky-800" },
+  { bg: "bg-pink-500/10",                        text: "text-pink-700 dark:text-pink-300",   border: "border-pink-200 dark:border-pink-800" },
+  { bg: "bg-emerald-100/80 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-800" },
+  { bg: "bg-amber-100/80 dark:bg-amber-900/20", text: "text-amber-700 dark:text-amber-300",  border: "border-amber-200 dark:border-amber-800" },
+  { bg: "bg-violet-100/80 dark:bg-violet-900/20", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200 dark:border-violet-800" },
 ];
 
-const defaultSpecialEvents: SpecialEvent[] = [
-  {
-    date: "2026-04-12",
-    title: "레벨테스트",
-    academyName: "멘토학원",
-    startTime: "11:00",
-    endTime: "12:00",
-    childId: "child1"
-  },
-  {
-    date: "2026-04-15",
-    title: "피아노 연주회",
-    academyName: "예종피아노학원",
-    startTime: "14:00",
-    endTime: "16:00",
-    childId: "child1"
-  },
-  {
-    date: "2026-04-20",
-    title: "학부모 상담",
-    academyName: "멘토학원",
-    startTime: "19:00",
-    endTime: "20:00",
-    childId: "child1"
-  },
-  {
-    date: "2026-04-18",
-    title: "태권도 발표회",
-    academyName: "태비태권도",
-    startTime: "18:00",
-    endTime: "19:00",
-    childId: "child2"
-  },
-];
+function hashColor(key: string, isSpecial = false) {
+  const h = Math.abs(key.split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0));
+  const c = COLOR_PALETTE[h % COLOR_PALETTE.length]!;
+  return isSpecial
+    ? { bg: c.bg.replace("/80", "/25"), text: c.text, border: c.border }
+    : c;
+}
 
-export function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)); // 2026년 4월
+export function CalendarPage({
+  userId,
+  userType = "parent",
+  displayName = "",
+}: {
+  userId?: string | undefined;
+  userType?: "parent" | "academy";
+  displayName?: string;
+}) {
+  const isAcademy = userType === "academy";
+  const myAcademyName = isAcademy ? displayName : undefined;
+  const parentDisplayName = !isAcademy ? displayName : "";
+
+  const childrenKey = `iplan-${userId ?? "default"}-children`;
+
+  // ── 전역 스케줄 (학부모·학원 공유) ──────────────────────────────
+  const [allSchedules, setAllSchedules] = useState<RegularSchedule[]>(() => {
+    const saved = localStorage.getItem(GLOBAL_SCHEDULES_KEY);
+    const global: RegularSchedule[] = saved ? JSON.parse(saved) : [];
+
+    // 학부모 첫 로그인: 등록 학원 일정 자동 시딩
+    if (!isAcademy && userId) {
+      const hasMySchedules = global.some(s => s.parentUserId === userId);
+      if (!hasMySchedules) {
+        const reg = getRegistrationData(userId);
+        if (reg?.childName && reg?.academy) {
+          const academyData = academyScheduleData[reg.academy];
+          if (academyData) {
+            const seeded: RegularSchedule[] = academyData.schedules.map((s: { dayOfWeek: number; startTime: string; endTime: string }) => ({
+              ...s,
+              id: makeId(),
+              parentUserId: userId,
+              parentName: reg.name,
+              childId: "child1",
+              childName: reg.childName,
+              academyName: reg.academy,
+            }));
+            return [...global, ...seeded];
+          }
+        }
+      }
+    }
+    return global;
+  });
+
+  const [allEvents, setAllEvents] = useState<SpecialEvent[]>(() => {
+    const saved = localStorage.getItem(GLOBAL_EVENTS_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // ── 학부모 전용 자녀 목록 ────────────────────────────────────────
   const [children, setChildren] = useState<Child[]>(() => {
-    const saved = localStorage.getItem("iplan-children");
-    return saved ? JSON.parse(saved) : defaultChildren;
+    if (isAcademy) return [];
+    const saved = localStorage.getItem(childrenKey);
+    if (saved) return JSON.parse(saved);
+
+    const initialChildren: Child[] = [{ id: "all", name: "전체" }];
+    if (userId) {
+      const reg = getRegistrationData(userId);
+      if (reg?.childName) {
+        initialChildren.push({ id: "child1", name: reg.childName });
+      }
+    }
+    return initialChildren;
   });
-  const [regularSchedules, setRegularSchedules] = useState<RegularSchedule[]>(() => {
-    const saved = localStorage.getItem("iplan-regularSchedules");
-    return saved ? JSON.parse(saved) : defaultRegularSchedules;
-  });
-  const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>(() => {
-    const saved = localStorage.getItem("iplan-specialEvents");
-    return saved ? JSON.parse(saved) : defaultSpecialEvents;
-  });
+
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [scheduleToEdit, setScheduleToEdit] = useState<any>(null);
   const [selectedChild, setSelectedChild] = useState<string>("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+
+  // ── localStorage 동기화 ─────────────────────────────────────────
+  useEffect(() => {
+    localStorage.setItem(GLOBAL_SCHEDULES_KEY, JSON.stringify(allSchedules));
+  }, [allSchedules]);
 
   useEffect(() => {
-    localStorage.setItem("iplan-children", JSON.stringify(children));
-  }, [children]);
+    localStorage.setItem(GLOBAL_EVENTS_KEY, JSON.stringify(allEvents));
+  }, [allEvents]);
 
   useEffect(() => {
-    localStorage.setItem("iplan-regularSchedules", JSON.stringify(regularSchedules));
-  }, [regularSchedules]);
+    if (!isAcademy) {
+      localStorage.setItem(childrenKey, JSON.stringify(children));
+    }
+  }, [children, childrenKey, isAcademy]);
 
-  useEffect(() => {
-    localStorage.setItem("iplan-specialEvents", JSON.stringify(specialEvents));
-  }, [specialEvents]);
+  // ── 내 스케줄/행사 필터링 ──────────────────────────────────────
+  const mySchedules = isAcademy
+    ? allSchedules.filter(s => s.academyName === myAcademyName)
+    : allSchedules.filter(s => s.parentUserId === userId);
 
-  const currentMonth = currentDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  const myEvents = isAcademy
+    ? allEvents.filter(e => e.academyName === myAcademyName)
+    : allEvents.filter(e => e.parentUserId === userId);
 
-  const filteredRegularSchedules = selectedChild === "all"
-    ? regularSchedules
-    : regularSchedules.filter(s => s.childId === selectedChild);
+  // ── 학원 모드: 탭에 표시할 학생 목록 (학부모(자녀) 형태) ─────────
+  const academyStudentTabs: Child[] = (() => {
+    if (!isAcademy) return [];
+    const seen = new Set<string>();
+    const tabs: Child[] = [{ id: "all", name: "전체" }];
+    mySchedules.forEach(s => {
+      const key = `${s.parentUserId}|${s.childId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        tabs.push({ id: key, name: `${s.parentName}(${s.childName})` });
+      }
+    });
+    return tabs;
+  })();
 
-  const filteredSpecialEvents = selectedChild === "all"
-    ? specialEvents
-    : specialEvents.filter(e => e.childId === selectedChild);
+  const displayChildren = isAcademy ? academyStudentTabs : children;
 
-  const getSchedulesForDate = (date: Date) => {
-    const dayOfWeek = date.getDay();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateString = `${year}-${month}-${day}`;
+  // ── 선택한 탭으로 2차 필터링 ───────────────────────────────────
+  const filteredRegularSchedules = mySchedules.filter(s => {
+    if (selectedChild === "all") return true;
+    return isAcademy
+      ? `${s.parentUserId}|${s.childId}` === selectedChild
+      : s.childId === selectedChild;
+  });
 
-    const regularSchedule = filteredRegularSchedules.filter(s => s.dayOfWeek === dayOfWeek);
-    const specialEvent = filteredSpecialEvents.filter(e => e.date === dateString);
+  const filteredSpecialEvents = myEvents.filter(e => {
+    if (selectedChild === "all") return true;
+    return isAcademy
+      ? `${e.parentUserId}|${e.childId}` === selectedChild
+      : e.childId === selectedChild;
+  });
 
-    return { regularSchedule, specialEvent };
-  };
-
-  const getDayOfWeekName = (dayOfWeek: number) => {
-    const days = ["일", "월", "화", "수", "목", "금", "토"];
-    return days[dayOfWeek];
-  };
-
-  const getAcademyColor = (academyName: string, isSpecialEvent: boolean = false, childId?: string) => {
-    // 둘째 자녀의 색상 (초록색 계열)
+  // ── 색상 ────────────────────────────────────────────────────────
+  const getAcademyColor = (academyName: string, isSpecialEvent = false, childId?: string) => {
+    if (isAcademy) {
+      return hashColor(childId ?? academyName, isSpecialEvent);
+    }
     if (childId === "child2") {
-      if (isSpecialEvent) {
-        return {
-          bg: "bg-emerald-400/25",
-          text: "text-emerald-800 dark:text-emerald-200",
-          border: "border-emerald-400 dark:border-emerald-600"
-        };
-      }
-      return {
-        bg: "bg-emerald-100/80 dark:bg-emerald-900/20",
-        text: "text-emerald-700 dark:text-emerald-300",
-        border: "border-emerald-200 dark:border-emerald-800"
-      };
+      return isSpecialEvent
+        ? { bg: "bg-emerald-400/25", text: "text-emerald-800 dark:text-emerald-200", border: "border-emerald-400 dark:border-emerald-600" }
+        : { bg: "bg-emerald-100/80 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-800" };
     }
-
-    // 큰아이 자녀의 색상 (기존 학원별 색상)
     if (academyName.includes("멘토")) {
-      if (isSpecialEvent) {
-        return {
-          bg: "bg-sky-400/25",
-          text: "text-sky-800 dark:text-sky-200",
-          border: "border-sky-400 dark:border-sky-600"
-        };
-      }
-      return {
-        bg: "bg-sky-100/80 dark:bg-sky-900/20",
-        text: "text-sky-700 dark:text-sky-300",
-        border: "border-sky-200 dark:border-sky-800"
-      };
-    } else if (academyName.includes("예종")) {
-      if (isSpecialEvent) {
-        return {
-          bg: "bg-pink-400/25",
-          text: "text-pink-800 dark:text-pink-200",
-          border: "border-pink-400 dark:border-pink-600"
-        };
-      }
-      return {
-        bg: "bg-pink-500/10",
-        text: "text-pink-700 dark:text-pink-300",
-        border: "border-pink-200 dark:border-pink-800"
-      };
+      return isSpecialEvent
+        ? { bg: "bg-sky-400/25", text: "text-sky-800 dark:text-sky-200", border: "border-sky-400 dark:border-sky-600" }
+        : { bg: "bg-sky-100/80 dark:bg-sky-900/20", text: "text-sky-700 dark:text-sky-300", border: "border-sky-200 dark:border-sky-800" };
     }
-    return {
-      bg: "bg-gray-500/10",
-      text: "text-gray-700 dark:text-gray-300",
-      border: "border-gray-200 dark:border-gray-800"
-    };
+    if (academyName.includes("예종")) {
+      return isSpecialEvent
+        ? { bg: "bg-pink-400/25", text: "text-pink-800 dark:text-pink-200", border: "border-pink-400 dark:border-pink-600" }
+        : { bg: "bg-pink-500/10", text: "text-pink-700 dark:text-pink-300", border: "border-pink-200 dark:border-pink-800" };
+    }
+    return { bg: "bg-gray-500/10", text: "text-gray-700 dark:text-gray-300", border: "border-gray-200 dark:border-gray-800" };
   };
 
+  // ── 이벤트 핸들러 ────────────────────────────────────────────────
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
     setIsDayModalOpen(true);
@@ -200,67 +243,120 @@ export function CalendarPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleAddAcademy = (newSchedules: RegularSchedule[], newChild?: { id: string; name: string }) => {
-    setRegularSchedules(prev => [...prev, ...newSchedules]);
+  const handleAddAcademy = (
+    newSchedules: { dayOfWeek: number; academyName: string; startTime: string; endTime: string; childId: string }[],
+    newChild?: { id: string; name: string }
+  ) => {
+    const childIdToUse = newSchedules[0]?.childId ?? "";
+    const childNameToUse = newChild
+      ? newChild.name
+      : children.find(c => c.id === childIdToUse)?.name ?? "";
+
+    const dedupedSchedules = newSchedules.filter(newS =>
+      !allSchedules.some(ex =>
+        ex.parentUserId === userId &&
+        ex.childId === newS.childId &&
+        ex.academyName === newS.academyName &&
+        ex.dayOfWeek === newS.dayOfWeek &&
+        ex.startTime === newS.startTime &&
+        ex.endTime === newS.endTime
+      )
+    );
+
+    if (dedupedSchedules.length === 0 && !newChild) {
+      alert("이미 등록된 학원 일정입니다.");
+      return;
+    }
+    if (dedupedSchedules.length > 0 && dedupedSchedules.length < newSchedules.length) {
+      alert("일부 일정이 이미 등록되어 있어 중복 일정은 제외하고 등록합니다.");
+    }
+
+    if (dedupedSchedules.length > 0) {
+      const fullSchedules: RegularSchedule[] = dedupedSchedules.map(s => ({
+        ...s,
+        id: makeId(),
+        parentUserId: userId ?? "",
+        parentName: parentDisplayName,
+        childName: childNameToUse,
+      }));
+      setAllSchedules(prev => [...prev, ...fullSchedules]);
+    }
     if (newChild) {
       setChildren(prev => [...prev, newChild]);
     }
   };
 
+  const handleAddEvent = ({
+    studentId,
+    date,
+    startTime,
+    endTime,
+    title,
+    description,
+  }: {
+    studentId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    title: string;
+    description: string;
+  }) => {
+    const [parentUserId = "", childId = ""] = studentId.split("|");
+    const related = allSchedules.find(
+      s => s.parentUserId === parentUserId && s.childId === childId
+    );
+    const newEvent: SpecialEvent = {
+      id: makeId(),
+      parentUserId,
+      parentName: related?.parentName ?? "",
+      childId,
+      childName: related?.childName ?? "",
+      academyName: myAcademyName ?? "",
+      date,
+      title,
+      startTime,
+      endTime,
+      description,
+    };
+    setAllEvents(prev => [...prev, newEvent]);
+  };
+
   const handleSaveSchedule = (updatedSchedule: any) => {
     if (updatedSchedule === null) {
-      // 삭제
       if (scheduleToEdit.type === "regular") {
-        setRegularSchedules(prev =>
-          prev.filter(s =>
-            !(s.dayOfWeek === scheduleToEdit.dayOfWeek &&
-              s.academyName === scheduleToEdit.academyName &&
-              s.startTime === scheduleToEdit.startTime &&
-              s.childId === scheduleToEdit.childId)
-          )
-        );
+        setAllSchedules(prev => prev.filter(s => s.id !== scheduleToEdit.id));
       } else {
-        setSpecialEvents(prev =>
-          prev.filter(e =>
-            !(e.date === scheduleToEdit.date &&
-              e.title === scheduleToEdit.title &&
-              e.academyName === scheduleToEdit.academyName &&
-              e.childId === scheduleToEdit.childId)
-          )
-        );
+        setAllEvents(prev => prev.filter(e => e.id !== scheduleToEdit.id));
       }
     } else {
-      // 수정
       if (updatedSchedule.type === "regular") {
-        setRegularSchedules(prev =>
-          prev.map(s =>
-            s.dayOfWeek === scheduleToEdit.dayOfWeek &&
-            s.academyName === scheduleToEdit.academyName &&
-            s.startTime === scheduleToEdit.startTime &&
-            s.childId === scheduleToEdit.childId
-              ? { ...s, ...updatedSchedule }
-              : s
-          )
+        setAllSchedules(prev =>
+          prev.map(s => s.id === scheduleToEdit.id ? { ...s, ...updatedSchedule } : s)
         );
       } else {
-        setSpecialEvents(prev =>
-          prev.map(e =>
-            e.date === scheduleToEdit.date &&
-            e.title === scheduleToEdit.title &&
-            e.academyName === scheduleToEdit.academyName &&
-            e.childId === scheduleToEdit.childId
-              ? { ...e, ...updatedSchedule }
-              : e
-          )
+        setAllEvents(prev =>
+          prev.map(e => e.id === scheduleToEdit.id ? { ...e, ...updatedSchedule } : e)
         );
       }
     }
   };
 
+  const getSchedulesForDate = (date: Date) => {
+    const dayOfWeek = date.getDay();
+    const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return {
+      regularSchedule: filteredRegularSchedules.filter(s => s.dayOfWeek === dayOfWeek),
+      specialEvent: filteredSpecialEvents.filter(e => e.date === dateString),
+    };
+  };
+
+  const getDayOfWeekName = (d: number) => ["일", "월", "화", "수", "목", "금", "토"][d];
+
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
   const startingDayOfWeek = firstDayOfMonth.getDay();
   const daysInMonth = lastDayOfMonth.getDate();
+  const currentMonth = currentDate.toLocaleDateString("ko-KR", { year: "numeric", month: "long" });
 
   return (
     <div className="w-full max-w-6xl mx-auto p-6">
@@ -270,21 +366,34 @@ export function CalendarPage() {
             <CalendarIcon className="w-6 h-6" />
             <h1>학원 일정</h1>
           </div>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-            title="학원 추가"
-          >
-            <Plus className="w-5 h-5" />
-            <span>학원 추가</span>
-          </button>
+          {!isAcademy && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-5 h-5" />
+              <span>학원 추가</span>
+            </button>
+          )}
+          {isAcademy && (
+            <button
+              onClick={() => setIsAddEventModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-5 h-5" />
+              <span>행사 추가</span>
+            </button>
+          )}
         </div>
-        <p className="text-muted-foreground">자녀의 학원 스케줄과 행사를 확인하세요</p>
+        <p className="text-muted-foreground">
+          {isAcademy ? "등록된 학생의 수업 일정을 확인하세요" : "자녀의 학원 스케줄과 행사를 확인하세요"}
+        </p>
       </div>
 
+      {/* 자녀 / 학생 탭 */}
       <div className="mb-6 border-b">
-        <div className="flex gap-1">
-          {children.map((child) => (
+        <div className="flex gap-1 overflow-x-auto">
+          {displayChildren.map((child) => (
             <button
               key={child.id}
               onClick={() => setSelectedChild(child.id)}
@@ -300,29 +409,27 @@ export function CalendarPage() {
         </div>
       </div>
 
+      {/* 정규 스케줄 & 다가오는 행사 */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-card border rounded-lg p-4">
           <h3 className="mb-3">정규 스케줄</h3>
           <div className="space-y-2">
             {filteredRegularSchedules.length > 0 ? (
-              filteredRegularSchedules
-                .sort((a, b) => {
-                  // 월(1), 화(2), 수(3), 목(4), 금(5), 토(6), 일(0) 순서로 정렬
-                  const orderA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek;
-                  const orderB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek;
-                  return orderA - orderB;
-                })
+              [...filteredRegularSchedules]
+                .sort((a, b) => (a.dayOfWeek === 0 ? 7 : a.dayOfWeek) - (b.dayOfWeek === 0 ? 7 : b.dayOfWeek))
                 .map((schedule, index) => {
                   const colors = getAcademyColor(schedule.academyName, false, schedule.childId);
-                  const childName = children.find(c => c.id === schedule.childId)?.name;
+                  const label = isAcademy
+                    ? `${schedule.parentName}(${schedule.childName})`
+                    : children.find(c => c.id === schedule.childId)?.name;
                   return (
                     <div key={index} className={`flex items-center gap-2 text-sm p-2 rounded ${colors.bg}`}>
                       <Clock className="w-4 h-4 text-muted-foreground" />
                       <span className="font-medium">{getDayOfWeekName(schedule.dayOfWeek)}</span>
                       <span className="text-muted-foreground">{schedule.startTime}~{schedule.endTime}</span>
-                      <span className={colors.text}>{schedule.academyName}</span>
-                      {selectedChild === "all" && childName && childName !== "전체" && (
-                        <span className="text-xs text-muted-foreground">({childName})</span>
+                      {!isAcademy && <span className={colors.text}>{schedule.academyName}</span>}
+                      {selectedChild === "all" && label && label !== "전체" && (
+                        <span className="text-xs text-muted-foreground">({label})</span>
                       )}
                     </div>
                   );
@@ -337,26 +444,31 @@ export function CalendarPage() {
           <h3 className="mb-3">다가오는 행사</h3>
           <div className="space-y-2">
             {filteredSpecialEvents.length > 0 ? (
-              filteredSpecialEvents.slice(0, 3).map((event, index) => {
-                const colors = getAcademyColor(event.academyName, true, event.childId);
-                const [year, month, day] = event.date.split('-');
-                const eventDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                const childName = children.find(c => c.id === event.childId)?.name;
-                return (
-                  <div key={index} className={`text-sm p-2 rounded ${colors.bg}`}>
-                    <div className="flex items-center gap-2">
-                      <div className="font-bold">{event.title}</div>
-                      {selectedChild === "all" && childName && childName !== "전체" && (
-                        <span className="text-xs text-muted-foreground">({childName})</span>
-                      )}
+              [...filteredSpecialEvents]
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .slice(0, 3)
+                .map((event, index) => {
+                  const colors = getAcademyColor(event.academyName, true, event.childId);
+                  const [y = "0", m = "1", d = "1"] = event.date.split("-");
+                  const eventDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                  const label = isAcademy
+                    ? `${event.parentName}(${event.childName})`
+                    : children.find(c => c.id === event.childId)?.name;
+                  return (
+                    <div key={index} className={`text-sm p-2 rounded ${colors.bg}`}>
+                      <div className="flex items-center gap-2">
+                        <div className="font-bold">{event.title}</div>
+                        {selectedChild === "all" && label && label !== "전체" && (
+                          <span className="text-xs text-muted-foreground">({label})</span>
+                        )}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {eventDate.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} {event.startTime}~{event.endTime}
+                      </div>
+                      {!isAcademy && <div className={`text-sm ${colors.text}`}>{event.academyName}</div>}
                     </div>
-                    <div className="text-muted-foreground">
-                      {eventDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} {event.startTime}~{event.endTime}
-                    </div>
-                    <div className={`text-sm ${colors.text}`}>{event.academyName}</div>
-                  </div>
-                );
-              })
+                  );
+                })
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">다가오는 행사가 없습니다</p>
             )}
@@ -364,6 +476,7 @@ export function CalendarPage() {
         </div>
       </div>
 
+      {/* 월별 캘린더 */}
       <div className="bg-card border rounded-lg p-6">
         <div className="flex items-center justify-between mb-6">
           <h2>{currentMonth}</h2>
@@ -408,7 +521,9 @@ export function CalendarPage() {
               date.getMonth() === new Date().getMonth() &&
               date.getFullYear() === new Date().getFullYear();
 
-            const { regularSchedule, specialEvent } = isCurrentMonth ? getSchedulesForDate(date) : { regularSchedule: [], specialEvent: [] };
+            const { regularSchedule, specialEvent } = isCurrentMonth
+              ? getSchedulesForDate(date)
+              : { regularSchedule: [], specialEvent: [] };
 
             return (
               <div
@@ -424,15 +539,17 @@ export function CalendarPage() {
                   <div className="h-full flex flex-col">
                     <span className={`text-sm font-medium mb-1 ${
                       date.getDay() === 0 ? "text-red-600 dark:text-red-400" :
-                      date.getDay() === 6 ? "text-blue-600 dark:text-blue-400" :
-                      ""
+                      date.getDay() === 6 ? "text-blue-600 dark:text-blue-400" : ""
                     }`}>{dayNumber}</span>
                     <div className="space-y-1 text-xs">
                       {regularSchedule.map((schedule, idx) => {
                         const colors = getAcademyColor(schedule.academyName, false, schedule.childId);
+                        const label = isAcademy
+                          ? schedule.childName
+                          : schedule.academyName.replace("학원", "");
                         return (
                           <div key={idx} className={`${colors.bg} ${colors.text} rounded px-1 py-0.5 truncate`}>
-                            {schedule.startTime.slice(0, 5)} {schedule.academyName.replace('학원', '')}
+                            {schedule.startTime.slice(0, 5)} {label}
                           </div>
                         );
                       })}
@@ -453,12 +570,22 @@ export function CalendarPage() {
         </div>
       </div>
 
-      <AddAcademyModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        children={children}
-        onSave={handleAddAcademy}
-      />
+      {!isAcademy && (
+        <AddAcademyModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          children={children}
+          onSave={handleAddAcademy}
+        />
+      )}
+      {isAcademy && (
+        <AddEventModal
+          isOpen={isAddEventModalOpen}
+          onClose={() => setIsAddEventModalOpen(false)}
+          students={academyStudentTabs.filter(s => s.id !== "all")}
+          onSave={handleAddEvent}
+        />
+      )}
 
       {selectedDate && (
         <>
@@ -471,7 +598,6 @@ export function CalendarPage() {
             onEditSchedule={handleEditSchedule}
             getAcademyColor={getAcademyColor}
           />
-
           {scheduleToEdit && (
             <EditScheduleModal
               isOpen={isEditModalOpen}

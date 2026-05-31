@@ -1,15 +1,32 @@
 import { useState } from "react";
 import { BookOpen, HelpCircle, X } from "lucide-react";
 
-// ── 가상 학부모 회원정보 DB (더미 데이터) ─────────────────────────
-const MOCK_PARENT_USERS = [
-  { name: "홍길동", userId: "parent123", phone: "01012345678", academy: "태비태권도", childName: "홍지우", password: "password123!" },
-  { name: "김철수", userId: "chulsoo456", phone: "01098765432", academy: "아이플랜어학원", childName: "김민재", password: "securePass1@" },
-  { name: "이영희", userId: "younghee789", phone: "01045678901", academy: "아이플랜수학학원", childName: "이서연", password: "myPassword3#" }
+// ── 가상 학부모 회원정보 DB (localStorage 기반) ────────────────────
+const DEFAULT_PARENT_USERS = [
+  { name: "홍길동", userId: "parent123",   phone: "01012345678", academy: "태비태권도",    childName: "홍지우", password: "password123!" },
+  { name: "김철수", userId: "chulsoo456",  phone: "01098765432", academy: "아이플랜어학원", childName: "김민재", password: "securePass1@" },
+  { name: "이영희", userId: "younghee789", phone: "01045678901", academy: "아이플랜수학학원", childName: "이서연", password: "myPassword3#" },
+  { name: "박지민", userId: "jimin123",    phone: "01055556666", academy: "멘토학원",       childName: "박서준", password: "jimin1234!" },
+  { name: "최수아", userId: "sooa456",     phone: "01077778888", academy: "예종피아노학원",  childName: "최하은", password: "sooa1234@" },
 ];
+
+type ParentUser = typeof DEFAULT_PARENT_USERS[0];
+
+function getParentUsers(): ParentUser[] {
+  try {
+    const stored = localStorage.getItem("iplan-users");
+    return stored ? JSON.parse(stored) : [...DEFAULT_PARENT_USERS];
+  } catch {
+    return [...DEFAULT_PARENT_USERS];
+  }
+}
+
+function saveParentUsers(users: ParentUser[]): void {
+  localStorage.setItem("iplan-users", JSON.stringify(users));
+}
 // ──────────────────────────────────────────────────────────────────
 
-export function AuthPage ({onLogin}: {onLogin: (userType: "parent" | "academy", academyId?: string) => void}) {
+export function AuthPage ({onLogin}: {onLogin: (userType: "parent" | "academy", academyId?: string, userId?: string, name?: string) => void}) {
   const [isLogin, setIsLogin] = useState(true);
   const [userType, setUserType] = useState<"parent" | "academy">("parent");
 
@@ -63,7 +80,7 @@ function ParentAuthForm({
 }: {
   isLogin: boolean;
   setIsLogin: (value: boolean) => void;
-  onLogin: (userType: "parent" | "academy", academyId?: string) => void;
+  onLogin: (userType: "parent" | "academy", academyId?: string, userId?: string, name?: string) => void;
 }) {
   const [showHelp, setShowHelp] = useState(false);
   
@@ -101,11 +118,12 @@ function ParentAuthForm({
       }
 
       if (isValid) {
-        const user = MOCK_PARENT_USERS.find(
+        const users = getParentUsers();
+        const user = users.find(
           (u) => u.userId === userIdInput.value && u.password === passwordInput.value
         );
         if (user) {
-          onLogin("parent");
+          onLogin("parent", undefined, user.userId, user.name);
           return;
         } else {
           currentErrors.loginError = "아이디 또는 비밀번호가 일치하지 않습니다. 다시 확인해 주세요.";
@@ -147,6 +165,7 @@ function ParentAuthForm({
 
     // 3. 아이디 검증 (기존 미입력/자릿수/형식/중복 검사 통합)
     const MOCK_DUPLICATE_IDS = ["admin123", "test123", "user123", "iplan123"];
+    const existingUsers = getParentUsers();
     if (!userIdInput.value.trim()) {
       currentErrors.userId = "아이디를 입력해 주세요.";
       isValid = false;
@@ -156,7 +175,7 @@ function ParentAuthForm({
     } else if (!/^[A-Za-z0-9]+$/.test(userIdInput.value)) {
       currentErrors.userId = "아이디는 영문, 숫자만 입력 가능합니다.";
       isValid = false;
-    } else if (MOCK_DUPLICATE_IDS.includes(userIdInput.value.toLowerCase())) {
+    } else if (MOCK_DUPLICATE_IDS.includes(userIdInput.value.toLowerCase()) || existingUsers.some(u => u.userId === userIdInput.value)) {
       currentErrors.userId = "중복된 아이디 입니다.";
       isValid = false;
     }
@@ -171,7 +190,7 @@ function ParentAuthForm({
     }
 
     // 5. 등록된 학원 검사
-    const MOCK_REGISTERED_ACADEMIES = ["태비태권도", "아이플랜어학원", "아이플랜수학학원"];
+    const MOCK_REGISTERED_ACADEMIES = ["태비태권도", "아이플랜어학원", "아이플랜수학학원", "멘토학원", "예종피아노학원"];
     const normalizedAcademy = academyInput.value.replace(/\s+/g, '');
     if (!academyInput.value.trim()) {
       currentErrors.academy = "학원 이름을 입력해 주세요.";
@@ -216,6 +235,16 @@ function ParentAuthForm({
 
     // 에러가 없을 때만 성공 콜백 함수 실행
     if (isValid) {
+      const users = getParentUsers();
+      users.push({
+        name: nameInput.value.trim(),
+        userId: userIdInput.value.trim(),
+        phone: phoneInput.value.trim(),
+        academy: academyInput.value.trim(),
+        childName: childNameInput.value.trim(),
+        password: passwordInput.value,
+      });
+      saveParentUsers(users);
       alert("회원가입이 완료되었습니다. 로그인해 주세요.");
       setIsLogin(true);
       form.reset();
@@ -532,9 +561,11 @@ function ParentAuthForm({
 }
 
 // ── 가상 학원 회원정보 DB (더미 데이터) ───────────────────────────
-const MOCK_ACADEMY_USERS = [
-  { academyName: "태비태권도", academyAddress: "서울시강남구테헤란로123", academyPhone: "0212345678", subjects: "태권도", managerName: "이관장", managerId: "academy123", managerPhone: "01011112222", password: "password123!", academyId: "taebee" },
-  { academyName: "아이플랜어학원", academyAddress: "서울시서초구반포대로456", academyPhone: "0298765432", subjects: "영어", managerName: "김원장", managerId: "english456", managerPhone: "01033334444", password: "securePass1@", academyId: "iplan-english" }
+let MOCK_ACADEMY_USERS = [
+  { academyName: "태비태권도",    academyAddress: "서울시강남구테헤란로123",    academyPhone: "0212345678", subjects: "태권도",         managerName: "이관장", managerId: "academy123", managerPhone: "01011112222", password: "password123!", academyId: "taebee" },
+  { academyName: "아이플랜어학원", academyAddress: "서울시서초구반포대로456",    academyPhone: "0298765432", subjects: "영어",           managerName: "김원장", managerId: "english456", managerPhone: "01033334444", password: "securePass1@", academyId: "iplan-english" },
+  { academyName: "멘토학원",      academyAddress: "서울시강남구역삼로234",      academyPhone: "0234567890", subjects: "국어, 영어, 수학", managerName: "김민지", managerId: "mentor123",  managerPhone: "01055556666", password: "mentor123!",  academyId: "mentor" },
+  { academyName: "예종피아노학원", academyAddress: "서울시서초구서초대로321",    academyPhone: "0287654321", subjects: "피아노",         managerName: "박예원", managerId: "yejong123",  managerPhone: "01077778888", password: "yejong123@", academyId: "yejong" },
 ];
 // ──────────────────────────────────────────────────────────────────
 
@@ -545,10 +576,12 @@ const MOCK_ACADEMY_API = [
   { id: "acad-003", name: "아이플랜수학학원", address: "경기도성남시분당구판교로789", phone: "0317654321"  },
   { id: "acad-004", name: "브레인영어학원",   address: "서울시마포구홍익로55",       phone: "0223456789"  },
   { id: "acad-005", name: "스타과학학원",     address: "인천시남동구구월동100번길",  phone: "0321234567"  },
+  { id: "acad-006", name: "멘토학원",         address: "서울시강남구역삼로234",      phone: "0234567890"  },
+  { id: "acad-007", name: "예종피아노학원",   address: "서울시서초구서초대로321",    phone: "0287654321"  },
 ];
 // ──────────────────────────────────────────────────────────────────
 
-function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "academy", academyId?: string)=>void}) {
+function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "academy", academyId?: string, userId?: string, name?: string)=>void}) {
   const [isAcademyLogin, setIsAcademyLogin] = useState(true);
 
   // 학원 정보 에러 state
@@ -610,7 +643,7 @@ function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "acade
           (u) => u.managerId === academyUserIdInput.value && u.password === academyPasswordInput.value
         );
         if (user) {
-          onLogin("academy", user.academyId);
+          onLogin("academy", user.academyId, user.managerId, user.academyName);
           return;
         } else {
           currentErrors.loginError = "아이디 또는 비밀번호가 일치하지 않습니다. 다시 확인해 주세요.";
@@ -781,6 +814,17 @@ function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "acade
     setRegErrors(currentErrors);
 
     if (isValid) {
+      MOCK_ACADEMY_USERS.push({
+        academyName: academyNameInput.value.trim(),
+        academyAddress: academyAddrInput.value.trim(),
+        academyPhone: academyPhoneInput.value.trim(),
+        subjects: subjectsInput.value.trim(),
+        managerName: managerNameInput.value.trim(),
+        managerId: managerIdInput.value.trim(),
+        managerPhone: managerPhoneInput.value.trim(),
+        password: managerPwInput.value,
+        academyId: `acad-${Date.now()}`,
+      });
       alert("학원 등록이 완료되었습니다. 로그인해 주세요.");
       setIsAcademyLogin(true);
       form.reset();

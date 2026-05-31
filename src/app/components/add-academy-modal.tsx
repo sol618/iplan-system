@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, Plus } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 
 interface AcademyScheduleData {
   academyName: string;
@@ -10,8 +10,7 @@ interface AcademyScheduleData {
   }[];
 }
 
-// 학원별 일정 데이터 (실제로는 서버에서 가져옴)
-const academyScheduleData: Record<string, AcademyScheduleData> = {
+export const academyScheduleData: Record<string, AcademyScheduleData> = {
   "멘토학원": {
     academyName: "멘토학원",
     schedules: [
@@ -45,19 +44,49 @@ interface AddAcademyModalProps {
   ) => void;
 }
 
+const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
 export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcademyModalProps) {
   const selectableChildren = children.filter(c => c.id !== "all");
 
   const [academyName, setAcademyName] = useState("");
-  const [childId, setChildId] = useState(() => selectableChildren[0]?.id ?? "child1");
+  const [academyError, setAcademyError] = useState("");
+  const [childId, setChildId] = useState(selectableChildren[0]?.id ?? "");
   const [newChildName, setNewChildName] = useState("");
-  const [isNewChild, setIsNewChild] = useState(false);
+  // 자녀가 없으면 처음부터 새 자녀 추가 모드로 시작
+  const [isNewChild, setIsNewChild] = useState(selectableChildren.length === 0);
+
+  // 모달이 열릴 때마다 폼 초기화
+  useEffect(() => {
+    if (isOpen) {
+      const fresh = children.filter(c => c.id !== "all");
+      setAcademyName("");
+      setAcademyError("");
+      setChildId(fresh[0]?.id ?? "");
+      setNewChildName("");
+      setIsNewChild(fresh.length === 0);
+    }
+  }, [isOpen]);
+
+  const trimmedName = academyName.trim();
+  const previewData = trimmedName ? academyScheduleData[trimmedName] : null;
+
+  const handleClose = () => {
+    setAcademyName("");
+    setAcademyError("");
+    onClose();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!academyName.trim()) {
-      alert("학원 이름을 입력해주세요.");
+    if (!trimmedName) {
+      setAcademyError("학원 이름을 입력해주세요.");
+      return;
+    }
+
+    if (!previewData) {
+      setAcademyError("등록되지 않은 학원입니다. 학원 측에 먼저 등록을 요청해주세요.");
       return;
     }
 
@@ -66,47 +95,30 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
       return;
     }
 
-    // 입력한 학원 이름으로 데이터 찾기 (실제로는 서버 API 호출)
-    const academyData = academyScheduleData[academyName];
-    if (!academyData) {
-      alert("등록되지 않은 학원입니다. 학원 측에 먼저 등록을 요청해주세요.");
-      return;
-    }
-
     const newChildId = isNewChild ? `child${Date.now()}` : childId;
     const newChild = isNewChild ? { id: newChildId, name: newChildName.trim() } : undefined;
 
-    // 학원의 모든 일정을 선택한 자녀에게 추가
-    const schedules = academyData.schedules.map(schedule => ({
-      ...schedule,
-      academyName: academyData.academyName,
+    const schedules = previewData.schedules.map(s => ({
+      ...s,
+      academyName: trimmedName,
       childId: newChildId,
     }));
 
     onSave(schedules, newChild);
-
-    // Reset form
-    setAcademyName("");
-    setChildId(selectableChildren[0]?.id ?? "child1");
-    setNewChildName("");
-    setIsNewChild(false);
-    onClose();
+    handleClose();
   };
 
   if (!isOpen) return null;
 
-  // 입력한 학원 이름으로 데이터 미리보기
-  const previewAcademyData = academyName ? academyScheduleData[academyName] : null;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
 
       <div className="relative w-full max-w-md bg-card border rounded-lg shadow-lg mx-4">
         <div className="border-b px-6 py-4 flex items-center justify-between">
           <h2>학원 등록</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -122,28 +134,24 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
               id="academy-name"
               type="text"
               value={academyName}
-              onChange={(e) => setAcademyName(e.target.value)}
+              onChange={(e) => { setAcademyName(e.target.value); setAcademyError(""); }}
               placeholder="예: 멘토학원"
               className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-              required
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              등록 가능 학원: 멘토학원, 예종피아노학원, 태비태권도
-            </p>
+            {academyError && (
+              <p className="text-sm text-destructive mt-1">{academyError}</p>
+            )}
           </div>
 
-          {previewAcademyData && (
+          {previewData && (
             <div className="p-3 rounded-lg bg-accent/30 border border-border">
               <p className="text-sm font-medium mb-2">학원 일정</p>
               <div className="space-y-1 text-sm text-muted-foreground">
-                {previewAcademyData.schedules.map((schedule, idx) => {
-                  const days = ["일", "월", "화", "수", "목", "금", "토"];
-                  return (
-                    <div key={idx}>
-                      • {days[schedule.dayOfWeek]}요일 {schedule.startTime}~{schedule.endTime}
-                    </div>
-                  );
-                })}
+                {previewData.schedules.map((s, idx) => (
+                  <div key={idx}>
+                    • {DAYS[s.dayOfWeek]}요일 {s.startTime}~{s.endTime}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -184,7 +192,6 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
                 onChange={(e) => setNewChildName(e.target.value)}
                 placeholder="예: 셋째"
                 className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                required
               />
             </div>
           )}
@@ -192,7 +199,7 @@ export function AddAcademyModal({ isOpen, onClose, children, onSave }: AddAcadem
           <div className="flex items-center gap-3 pt-4 border-t">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-4 py-2.5 border border-border rounded-lg hover:bg-accent transition-colors"
             >
               취소

@@ -26,6 +26,18 @@ export function EditScheduleModal({ isOpen, onClose, schedule, onSave }: EditSch
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const [sh = 0, sm = 0] = startTime.split(":").map(Number);
+    const [eh = 0, em = 0] = endTime.split(":").map(Number);
+    const start = sh * 60 + sm;
+    const end = eh * 60 + em;
+    if (end <= start) {
+      alert("종료 시간이 시작 시간보다 이르거나 같을 수 없습니다.");
+      return;
+    }
+    if (end - start > 13 * 60) {
+      alert("학원 수업 시간은 13시간을 초과할 수 없습니다.");
+      return;
+    }
     onSave({
       ...schedule,
       title,
