@@ -28,12 +28,12 @@ const academies: Academy[] = [
 const initialNotifications: Notification[] = [
   {
     id: 1,
-    senderName: "멘토학원 행정실",
+    senderName: "김민지 선생님",
     academyName: "멘토학원",
     message: "5월 학원비 납부 안내입니다. 납부 기한은 4월 25일까지이며, 금액은 350,000원입니다. 계좌이체 또는 카드 결제 가능합니다.",
     timestamp: "2026-04-11T15:20:00",
     isRead: false,
-    childName: "큰아이"
+    childName: "아들"
   },
   {
     id: 2,
@@ -42,17 +42,17 @@ const initialNotifications: Notification[] = [
     message: "다음 주 월요일은 임시 휴원입니다. 참고 부탁드립니다.",
     timestamp: "2026-04-11T14:30:00",
     isRead: false,
-    childName: "큰아이"
+    childName: "아들"
   },
   {
     id: 3,
-    senderName: "이준호 관장님",
+    senderName: "이관장 관장님",
     academyName: "태비태권도",
     message: "이번 달 수강료 납부 안내입니다. 납부 기한은 5월 25일까지이며, 금액은 150,000원입니다.",
     timestamp: "2026-05-22T12:00:00",
     isRead: true,
-    childName: "둘째",
-    parentName: "김서준 학부모"
+    childName: "아들",
+    parentName: "홍지우 학부모"
   },
   {
     id: 4,
@@ -61,21 +61,21 @@ const initialNotifications: Notification[] = [
     message: "다음 주 토요일 레벨테스트 안내입니다. 시간은 오전 11시~12시입니다.",
     timestamp: "2026-04-08T11:20:00",
     isRead: true,
-    childName: "큰아이"
+    childName: "아들"
   },
    {
     id: 5,
-    senderName: "이준호 관장님",
+    senderName: "이관장 관장님",
     academyName: "태비태권도",
-    message: "서준이 이번주 승급 심사있습니다! 금요일 수업 전까지 품새 3단 연습해오면 좋을 것 같습니다.^^",
+    message: "지우 이번주 승급 심사있습니다! 금요일 수업 전까지 품새 3단 연습해오면 좋을 것 같습니다.^^",
     timestamp: "2026-04-09T16:45:00",
     isRead: true,
-    childName: "둘째",
-    parentName: "김서준 학부모"
+    childName: "아들",
+    parentName: "홍지우 학부모"
   },
   {
   id: 6,
-  senderName: "이준호 관장님",
+  senderName: "이관장 관장님",
   academyName: "태비태권도",
   message: "하은이가 오늘 발차기 자세를 아주 열심히 연습했습니다. 집에서도 많이 칭찬해 주세요.^^",
   timestamp: "2026-05-25T18:30:00",
@@ -98,7 +98,7 @@ export function NotificationPage({
   const [selectedAcademy, setSelectedAcademy] = useState(
   userType === "academy" ? "taeby" : "mentor"
   );
-  const [selectedParent, setSelectedParent] = useState("김서준 학부모");
+  const [selectedParent, setSelectedParent] = useState("홍지우 학부모");
   const [currentAcademyForModal, setCurrentAcademyForModal] = useState("");
 
   const filteredNotifications = notifications.filter((n) => {
@@ -201,14 +201,14 @@ useEffect(() => {
     ) : (
       <>
         <button
-  onClick={() => setSelectedParent("김서준 학부모")}
+  onClick={() => setSelectedParent("홍지우 학부모")}
   className={`px-6 py-3 border-b-2 ${
-    selectedParent === "김서준 학부모"
+    selectedParent === "홍지우 학부모"
       ? "border-primary text-primary font-medium"
       : "border-transparent text-muted-foreground"
   }`}
 >
-  김서준 학부모
+  홍지우 학부모
 </button>
 
 <button
@@ -375,7 +375,7 @@ interface Parent {
 }
 
 const parentsList: Parent[] = [
-  { id: "p1", name: "김지훈", children: ["김서준"], phone: "010-1234-5678" },
+  { id: "p1", name: "홍길동", children: ["홍지우"], phone: "010-1234-5678" },
   { id: "p2", name: "이수진", children: ["이하은"], phone: "010-2345-6789" },
   { id: "p3", name: "박민수", children: ["박지우", "박지호"], phone: "010-3456-7890" },
   { id: "p4", name: "최영희", children: ["최민재"], phone: "010-4567-8901" },
@@ -458,11 +458,11 @@ if (!isValid) return;
   isRead: false,
   parentName: selectedParents.includes("p2")
   ? "이하은 학부모"
-  : "김서준 학부모",
+  : "홍지우 학부모",
 
   childName: selectedParents.includes("p2")
     ? "하은이"
-    : "서준이",
+    : "지우",
 };
 
 onSend(newNotification);
@@ -543,20 +543,28 @@ onSend(newNotification);
 )}
 
           <div>
-            <label htmlFor="message" className="block mb-2">
-              메시지
-            </label>
+            <div className="flex items-center justify-between mb-2">
+  <label htmlFor="message">메시지</label>
+  <span
+    className={`text-xs ${
+      message.length > 300 ? "text-destructive" : "text-muted-foreground"
+    }`}
+  >
+    {message.length} / 300자
+  </span>
+</div>
             <textarea
               id="message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="학부모님께 전달할 메시지를 입력하세요"
               rows={6}
-              className={`w-full px-4 py-3 bg-input-background border rounded-lg resize-none focus:outline-none focus:ring-2 ${
-  errors.message
+              className={`w-full px-4 py-2.5 bg-input-background border rounded-lg resize-none focus:outline-none focus:ring-2 ${
+  errors.message || message.length > 300
     ? "border-destructive focus:ring-destructive"
     : "border-border focus:ring-ring"
 }`}
+
               
             />
             {errors.message && (
