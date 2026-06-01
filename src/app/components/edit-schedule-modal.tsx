@@ -13,16 +13,23 @@ interface EditScheduleModalProps {
     date?: string;
     dayOfWeek?: number;
     childId?: string;
+    childName?: string;
   };
   onSave: (updatedSchedule: any) => void;
+  isAcademy?: boolean;
+  childOptions: { id: string; name: string }[];
+  academyOptions: string[];
 }
 
-export function EditScheduleModal({ isOpen, onClose, schedule, onSave }: EditScheduleModalProps) {
+export function EditScheduleModal({ isOpen, onClose, schedule, onSave, isAcademy = false, childOptions, academyOptions }: EditScheduleModalProps) {
   const [title, setTitle] = useState(schedule.title || "정규 수업");
   const [academyName, setAcademyName] = useState(schedule.academyName);
   const [startTime, setStartTime] = useState(schedule.startTime);
   const [endTime, setEndTime] = useState(schedule.endTime);
-  const [childId, setChildId] = useState(schedule.childId || "child1");
+  const [childId, setChildId] = useState(schedule.childId || childOptions[0]?.id || "");
+
+  // 학원 계정이거나 행사(특별 일정) 수정 시: 학원 드롭다운 제거 + 자녀(학생) 고정
+  const isFixedLayout = isAcademy || schedule.type === "special";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +45,7 @@ export function EditScheduleModal({ isOpen, onClose, schedule, onSave }: EditSch
       alert("학원 수업 시간은 13시간을 초과할 수 없습니다.");
       return;
     }
+    const selectedChild = childOptions.find(c => c.id === childId);
     onSave({
       ...schedule,
       title,
@@ -45,13 +53,14 @@ export function EditScheduleModal({ isOpen, onClose, schedule, onSave }: EditSch
       startTime,
       endTime,
       childId,
+      childName: selectedChild?.name ?? schedule.childName,
     });
     onClose();
   };
 
   const handleDelete = () => {
     if (confirm("정말 이 일정을 삭제하시겠습니까?")) {
-      onSave(null); // null을 전달하여 삭제 처리
+      onSave(null);
       onClose();
     }
   };
@@ -90,37 +99,46 @@ export function EditScheduleModal({ isOpen, onClose, schedule, onSave }: EditSch
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${isFixedLayout ? "grid-cols-1" : "grid-cols-2"}`}>
             <div>
               <label htmlFor="child" className="block mb-2">
-                자녀
+                {isAcademy ? "학생" : "자녀"}
               </label>
-              <select
-                id="child"
-                value={childId}
-                onChange={(e) => setChildId(e.target.value)}
-                className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="child1">큰아이</option>
-                <option value="child2">둘째</option>
-              </select>
+              {isFixedLayout ? (
+                <div className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg text-sm">
+                  {schedule.childName || "-"}
+                </div>
+              ) : (
+                <select
+                  id="child"
+                  value={childId}
+                  onChange={(e) => setChildId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {childOptions.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            <div>
-              <label htmlFor="academy" className="block mb-2">
-                학원
-              </label>
-              <select
-                id="academy"
-                value={academyName}
-                onChange={(e) => setAcademyName(e.target.value)}
-                className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="멘토학원">멘토학원</option>
-                <option value="예종피아노학원">예종피아노학원</option>
-                <option value="태비태권도">태비태권도</option>
-              </select>
-            </div>
+            {!isFixedLayout && (
+              <div>
+                <label htmlFor="academy" className="block mb-2">
+                  학원
+                </label>
+                <select
+                  id="academy"
+                  value={academyName}
+                  onChange={(e) => setAcademyName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {academyOptions.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

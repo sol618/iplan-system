@@ -31,7 +31,7 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("11:00");
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [titleError, setTitleError] = useState("");
   const [timeError, setTimeError] = useState("");
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
       setStartTime("10:00");
       setEndTime("11:00");
       setTitle("");
-      setDescription("");
+      setTitleError("");
       setTimeError("");
     }
   }, [isOpen]);
@@ -54,7 +54,7 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
       return;
     }
     if (!title.trim()) {
-      alert("행사 제목을 입력해주세요.");
+      setTitleError("행사 제목을 입력해 주세요.");
       return;
     }
     if (!date) {
@@ -81,7 +81,7 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
       startTime,
       endTime,
       title: title.trim(),
-      description: description.trim(),
+      description: "",
     });
     onClose();
   };
@@ -168,30 +168,17 @@ export function AddEventModal({ isOpen, onClose, students, onSave }: AddEventMod
 
             {/* 행사 제목 */}
             <div>
-              <label className="block mb-2">행사 제목</label>
+              <label className="block mb-2">행사 제목 <span className="text-destructive">*</span></label>
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); setTitleError(""); }}
                 placeholder="예: 레벨테스트, 발표회"
-                className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                required
+                className={`w-full px-4 py-2.5 bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${titleError ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
-            </div>
-
-            {/* 내용 */}
-            <div>
-              <label className="block mb-2">
-                내용
-                <span className="ml-1 text-sm text-muted-foreground">(선택)</span>
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="행사에 대한 세부 내용을 입력하세요"
-                rows={3}
-                className="w-full px-4 py-2.5 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-              />
+              {titleError && (
+                <p className="mt-1.5 text-sm font-medium text-destructive">{titleError}</p>
+              )}
             </div>
 
             <div className="flex items-center gap-3 pt-4 border-t">

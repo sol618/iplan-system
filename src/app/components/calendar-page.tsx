@@ -607,6 +607,17 @@ export function CalendarPage({
               }}
               schedule={scheduleToEdit}
               onSave={handleSaveSchedule}
+              isAcademy={isAcademy}
+              childOptions={
+                isAcademy
+                  ? mySchedules
+                      .filter((s, i, arr) =>
+                        arr.findIndex(x => x.parentUserId === s.parentUserId && x.childId === s.childId) === i
+                      )
+                      .map(s => ({ id: s.childId, name: s.childName }))
+                  : children.filter(c => c.id !== "all")
+              }
+              academyOptions={[...new Set(mySchedules.map(s => s.academyName))]}
             />
           )}
         </>
