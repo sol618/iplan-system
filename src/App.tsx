@@ -22,7 +22,18 @@ export default function App() {
   if (!saved) return 2;
 
   const notifications = JSON.parse(saved);
-  return notifications.filter((n: any) => !n.isRead).length;
+  return notifications.filter(
+  (n: any) =>
+    !n.isRead &&
+    (
+      n.parentName === "홍지우 학부모" ||
+      (
+        n.academyName === "멘토학원" &&
+        n.parentName === undefined &&
+        n.childName === "아들"
+      )
+    )
+).length;
 });
 
   if (!isAuthenticated) {
