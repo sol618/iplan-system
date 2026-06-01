@@ -400,6 +400,8 @@ function WriteNotificationModal({
 }) {
   const [message, setMessage] = useState("");
   const [selectedParents, setSelectedParents] = useState<string[]>([]);
+  const [parentError, setParentError] = useState(false)
+  const [messageError, setMessageError] = useState(false)
   const [selectAll, setSelectAll] = useState(false);
   const [errors, setErrors] = useState({
   parents: "",
@@ -407,21 +409,26 @@ function WriteNotificationModal({
 });
 
   const handleToggleParent = (parentId: string) => {
-    setSelectedParents(prev =>
-      prev.includes(parentId)
-        ? prev.filter(id => id !== parentId)
-        : [...prev, parentId]
-    );
-  };
+  setErrors(prev => ({ ...prev, parents: "" }));
 
+  setSelectedParents(prev =>
+    prev.includes(parentId)
+      ? prev.filter(id => id !== parentId)
+      : [...prev, parentId]
+  );
+};
+
+  
   const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedParents([]);
-    } else {
-      setSelectedParents(parentsList.map(p => p.id));
-    }
-    setSelectAll(!selectAll);
-  };
+  setErrors(prev => ({ ...prev, parents: "" }));
+
+  if (selectAll) {
+    setSelectedParents([]);
+  } else {
+    setSelectedParents(parentsList.map(p => p.id));
+  }
+  setSelectAll(!selectAll);
+};
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -556,7 +563,10 @@ onSend(newNotification);
             <textarea
               id="message"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+  setMessage(e.target.value);
+  setErrors(prev => ({ ...prev, message: "" }));
+}}
               placeholder="학부모님께 전달할 메시지를 입력하세요"
               rows={6}
               className={`w-full px-4 py-2.5 bg-input-background border rounded-lg resize-none focus:outline-none focus:ring-2 ${
