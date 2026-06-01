@@ -253,10 +253,14 @@ useEffect(() => {
 
         <div className="p-4 space-y-4">
           {filteredNotifications.length > 0 ? (
-            (userType === "academy"
-  ? filteredNotifications
-  : filteredNotifications
-).map((notification, index, arr) => {
+          
+  [...filteredNotifications]
+    .sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() -
+        new Date(b.timestamp).getTime()
+    )
+    .map((notification, index, arr) => {
               const prevNotification = arr[index - 1];
               const currentDate = new Date(notification.timestamp).toLocaleDateString('ko-KR');
               const prevDate = prevNotification ? new Date(prevNotification.timestamp).toLocaleDateString('ko-KR') : null;
