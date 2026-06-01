@@ -93,13 +93,19 @@ export function NotificationPage({
   onUnreadCountChange: (count: number) => void;
   userType: "parent" | "academy";
 }) {
-  const [notifications, setNotifications] = useState<Notification[]>(notificationMemory);
+  const [notifications, setNotifications] = useState<Notification[]>(() => {
+  const saved = localStorage.getItem("notifications");
+  return saved ? JSON.parse(saved) : notificationMemory;
+});
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
   const [selectedAcademy, setSelectedAcademy] = useState(
   userType === "academy" ? "taeby" : "mentor"
   );
   const [selectedParent, setSelectedParent] = useState("홍지우 학부모");
   const [currentAcademyForModal, setCurrentAcademyForModal] = useState("");
+  useEffect(() => {
+  localStorage.setItem("notifications", JSON.stringify(notifications));
+}, [notifications]);
 
   const filteredNotifications = notifications.filter((n) => {
   if (userType === "academy") {
@@ -249,7 +255,7 @@ useEffect(() => {
           {filteredNotifications.length > 0 ? (
             (userType === "academy"
   ? filteredNotifications
-  : [...filteredNotifications].reverse()
+  : filteredNotifications
 ).map((notification, index, arr) => {
               const prevNotification = arr[index - 1];
               const currentDate = new Date(notification.timestamp).toLocaleDateString('ko-KR');
@@ -290,7 +296,14 @@ useEffect(() => {
   academyName={currentAcademyForModal}
   selectedParent={selectedParent}
   onSend={(newNotification) => {
-    setNotifications(prev => [...prev, newNotification]);
+    setNotifications((prev) => [
+  ...prev,
+  {
+    ...newNotification,
+    senderName: "이관장 관장님",
+    childName: "아들",
+  },
+]);
   }}
 />
     </div>
@@ -343,9 +356,7 @@ function MessageItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
           <span className="font-medium text-sm">{notification.senderName}</span>
-          {notification.childName && (
-            <span className="text-xs text-muted-foreground">({notification.childName})</span>
-          )}
+          
         </div>
         <div className={`inline-block max-w-full px-4 py-2 rounded-2xl ${
           notification.isRead

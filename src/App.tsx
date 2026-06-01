@@ -17,7 +17,13 @@ export default function App() {
     "home" | "announcements" | "calendar" | "notifications"
   >("announcements");
   const [selectedAcademy, setSelectedAcademy] = useState("mentor");
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(2);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(() => {
+  const saved = localStorage.getItem("notifications");
+  if (!saved) return 2;
+
+  const notifications = JSON.parse(saved);
+  return notifications.filter((n: any) => !n.isRead).length;
+});
 
   if (!isAuthenticated) {
     return (
