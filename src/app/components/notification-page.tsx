@@ -107,19 +107,40 @@ export function NotificationPage({
   localStorage.setItem("notifications", JSON.stringify(notifications));
 }, [notifications]);
 
-  const filteredNotifications = notifications.filter((n) => {
+ const filteredNotifications = notifications.filter((n) => {
+  const selectedAcademyName = academies.find(
+    (a) => a.id === selectedAcademy
+  )?.name;
+
   if (userType === "academy") {
     return n.parentName === selectedParent;
   }
 
   return (
-    n.academyName === academies.find(a => a.id === selectedAcademy)?.name &&
-    n.childName !== "하은이"
-  );
+  n.academyName === selectedAcademyName &&
+  (
+    n.parentName === "홍지우 학부모" ||
+    (
+      selectedAcademyName === "멘토학원" &&
+      n.parentName === undefined &&
+      n.childName === "아들"
+    )
+  )
+);
 });
-
   const unreadCount = filteredNotifications.filter(n => !n.isRead).length;
-  const totalUnreadCount = notifications.filter(n => !n.isRead).length;
+  const totalUnreadCount = notifications.filter(
+  (n) =>
+    !n.isRead &&
+    (
+      n.parentName === "홍지우 학부모" ||
+      (
+        n.academyName === "멘토학원" &&
+        n.parentName === undefined &&
+        n.childName === "아들"
+      )
+    )
+).length;
   useEffect(() => {
   onUnreadCountChange(totalUnreadCount);
 }, [totalUnreadCount, onUnreadCountChange]);
@@ -146,8 +167,20 @@ useEffect(() => {
   };
 
   const getUnreadCountByAcademy = (academyName: string) => {
-    return notifications.filter(n => n.academyName === academyName && !n.isRead).length;
-  };
+  return notifications.filter(
+    (n) =>
+      n.academyName === academyName &&
+      !n.isRead &&
+      (
+        n.parentName === "홍지우 학부모" ||
+        (
+          academyName === "멘토학원" &&
+          n.parentName === undefined &&
+          n.childName === "아들"
+        )
+      )
+  ).length;
+};
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
@@ -392,12 +425,6 @@ interface Parent {
 const parentsList: Parent[] = [
   { id: "p1", name: "홍길동", children: ["홍지우"], phone: "010-1234-5678" },
   { id: "p2", name: "이수진", children: ["이하은"], phone: "010-2345-6789" },
-  { id: "p3", name: "박민수", children: ["박지우", "박지호"], phone: "010-3456-7890" },
-  { id: "p4", name: "최영희", children: ["최민재"], phone: "010-4567-8901" },
-  { id: "p5", name: "정은영", children: ["정서윤"], phone: "010-5678-9012" },
-  { id: "p6", name: "강동원", children: ["강예준"], phone: "010-6789-0123" },
-  { id: "p7", name: "윤서연", children: ["윤지안"], phone: "010-7890-1234" },
-  { id: "p8", name: "한지민", children: ["한수아", "한수빈"], phone: "010-8901-2345" },
 ];
 
 function WriteNotificationModal({
@@ -471,23 +498,28 @@ if (!message.trim()) {
 setErrors(newErrors);
 
 if (!isValid) return;
-    const newNotification: Notification = {
-  id: Date.now(),
-  senderName: "태비태권도",
-  academyName: academyName,
-  message,
-  timestamp: new Date().toISOString(),
-  isRead: false,
-  parentName: selectedParents.includes("p2")
-  ? "이하은 학부모"
-  : "홍지우 학부모",
+    selectedParents.forEach((parentId) => {
+  const newNotification: Notification = {
+    id: Date.now() + Math.random(),
+    senderName: "이관장 관장님",
+    academyName,
+    message,
+    timestamp: new Date().toISOString(),
+    isRead: false,
 
-  childName: selectedParents.includes("p2")
-    ? "하은이"
-    : "지우",
-};
+    parentName:
+      parentId === "p2"
+        ? "이하은 학부모"
+        : "홍지우 학부모",
 
-onSend(newNotification);
+    childName:
+      parentId === "p2"
+        ? "하은이"
+        : "지우",
+  };
+
+  onSend(newNotification);
+});
 
     setMessage("");
     setSelectedParents([]);
