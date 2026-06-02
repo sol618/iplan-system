@@ -5,8 +5,7 @@ import { BookOpen, HelpCircle, X } from "lucide-react";
 const DEFAULT_PARENT_USERS = [
   { name: "홍길동", userId: "parent123",   phone: "01012345678", academy: "태비태권도",    childName: "홍지우", password: "password123!" },
   { name: "김철수", userId: "chulsoo456",  phone: "01098765432", academy: "아이플랜어학원", childName: "김민재", password: "securePass1@" },
-  { name: "이영희", userId: "younghee789", phone: "01045678901", academy: "아이플랜수학학원", childName: "이서연", password: "myPassword3#" },
-  { name: "박지민", userId: "jimin123",    phone: "01055556666", academy: "멘토학원",       childName: "박서준", password: "jimin1234!" },
+  { name: "박지민", userId: "jimin123",    phone: "01055556666", academy: "멘토학원",       childName: "박서준", password: "jimin1234" },
   { name: "최수아", userId: "sooa456",     phone: "01077778888", academy: "예종피아노학원",  childName: "최하은", password: "sooa1234@" },
 ];
 
@@ -190,7 +189,7 @@ function ParentAuthForm({
     }
 
     // 5. 등록된 학원 검사
-    const MOCK_REGISTERED_ACADEMIES = ["태비태권도", "아이플랜어학원", "아이플랜수학학원", "멘토학원", "예종피아노학원"];
+    const MOCK_REGISTERED_ACADEMIES = ["태비태권도", "아이플랜어학원", "멘토학원", "예종피아노학원"];
     const normalizedAcademy = academyInput.value.replace(/\s+/g, '');
     if (!academyInput.value.trim()) {
       currentErrors.academy = "학원 이름을 입력해 주세요.";
@@ -573,7 +572,6 @@ let MOCK_ACADEMY_USERS = [
 const MOCK_ACADEMY_API = [
   { id: "acad-001", name: "태비태권도",       address: "서울시강남구테헤란로123",    phone: "0212345678"  },
   { id: "acad-002", name: "아이플랜어학원",   address: "서울시서초구반포대로456",    phone: "0298765432"  },
-  { id: "acad-003", name: "아이플랜수학학원", address: "경기도성남시분당구판교로789", phone: "0317654321"  },
   { id: "acad-004", name: "브레인영어학원",   address: "서울시마포구홍익로55",       phone: "0223456789"  },
   { id: "acad-005", name: "스타과학학원",     address: "인천시남동구구월동100번길",  phone: "0321234567"  },
   { id: "acad-006", name: "멘토학원",         address: "서울시강남구역삼로234",      phone: "0234567890"  },

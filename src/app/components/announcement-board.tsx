@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Megaphone, Pin, PenSquare, Trash2, Edit, X } from "lucide-react";
 import { WriteAnnouncementModal } from "./write-announcement-modal";
 import { EditAnnouncementModal } from "./edit-announcement-modal";
@@ -164,6 +164,9 @@ const initialAnnouncements: Announcement[] = [
   }
 ];
 
+// 학원·학부모가 공유하는 전역 공지 저장소
+const ANNOUNCEMENTS_KEY = "iplan-announcements";
+
 function getTodayDateString() {
   const today = new Date();
   const year = today.getFullYear();
@@ -183,7 +186,19 @@ export function AnnouncementBoard({ academyId, userType }: AnnouncementBoardProp
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    try {
+      const saved = localStorage.getItem(ANNOUNCEMENTS_KEY);
+      return saved ? JSON.parse(saved) : initialAnnouncements;
+    } catch {
+      return initialAnnouncements;
+    }
+  });
+
+  // 공지가 바뀔 때마다 전역 저장 → 학부모 계정에서도 바로 확인 가능
+  useEffect(() => {
+    localStorage.setItem(ANNOUNCEMENTS_KEY, JSON.stringify(announcements));
+  }, [announcements]);
 
   const academyAnnouncements = announcements.filter(a => a.academyId === academyId);
   const pinnedAnnouncements = academyAnnouncements

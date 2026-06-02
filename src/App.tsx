@@ -1,11 +1,23 @@
 import React, { useState } from "react";
 import { Navigation } from "./app/components/navigation.js";
-import { AcademyTabs } from "./app/components/academy-tabs.js";
+import { AcademyTabs, getParentAcademies } from "./app/components/academy-tabs.js";
 import { AnnouncementBoard } from "./app/components/announcement-board.js";
-import { CalendarPage } from "./app/components/calendar-page.js";
+import { CalendarPage, ensureSeeded } from "./app/components/calendar-page.js";
 import { NotificationPage } from "./app/components/notification-page.js";
 import { AuthPage } from "./app/components/auth-page.js";
 
+// 로그인한 학부모(userId)에게 도착한 안 읽은 알림 개수
+function countUnreadForUser(userId?: string): number {
+  if (!userId) return 0;
+  try {
+    const saved = localStorage.getItem("notifications");
+    if (!saved) return 0;
+    const notifications = JSON.parse(saved);
+    return notifications.filter((n: any) => !n.isRead && n.parentUserId === userId).length;
+  } catch {
+    return 0;
+  }
+}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -17,33 +29,23 @@ export default function App() {
     "home" | "announcements" | "calendar" | "notifications"
   >("announcements");
   const [selectedAcademy, setSelectedAcademy] = useState("mentor");
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(() => {
-  const saved = localStorage.getItem("notifications");
-  if (!saved) return 2;
-
-  const notifications = JSON.parse(saved);
-  return notifications.filter(
-  (n: any) =>
-    !n.isRead &&
-    (
-      n.parentName === "홍지우 학부모" ||
-      (
-        n.academyName === "멘토학원" &&
-        n.parentName === undefined &&
-        n.childName === "아들"
-      )
-    )
-).length;
-});
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   if (!isAuthenticated) {
     return (
       <AuthPage
         onLogin={(type, academyId, userId, name) => {
+          // 어떤 탭을 먼저 열든 학원 계정에서 모든 학생이 보이도록, 로그인 시 전역 스케줄을 시딩한다.
+          ensureSeeded();
           setUserType(type);
           setLoggedInAcademyId(academyId);
           setLoggedInUserId(userId);
           setLoggedInName(name ?? "");
+          setUnreadNotificationCount(type === "parent" ? countUnreadForUser(userId) : 0);
+          if (type === "parent") {
+            const acs = getParentAcademies(userId);
+            if (acs[0]) setSelectedAcademy(acs[0].id);
+          }
           setIsAuthenticated(true);
         }}
       />
@@ -62,6 +64,7 @@ export default function App() {
         <>
           {userType === "parent" && (
             <AcademyTabs
+              academies={getParentAcademies(loggedInUserId)}
               selectedAcademy={selectedAcademy}
               onSelectAcademy={setSelectedAcademy}
             />
@@ -80,6 +83,8 @@ export default function App() {
     <NotificationPage
       onUnreadCountChange={setUnreadNotificationCount}
       userType={userType}
+      userId={loggedInUserId}
+      displayName={loggedInName}
     />
   </div>
 )}
