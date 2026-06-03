@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus, Trash2 } from "lucide-react";
 import { DayScheduleModal } from "./day-schedule-modal";
 import { EditScheduleModal } from "./edit-schedule-modal";
 import { AddAcademyModal, academyScheduleData } from "./add-academy-modal";
 import { AddEventModal } from "./add-event-modal";
+import { AddScheduleModal } from "./add-schedule-modal";
 
 interface Child {
   id: string;
@@ -20,6 +21,7 @@ interface RegularSchedule {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  excludedDates?: string[]; // 이 반복 일정에서 1회 삭제된 날짜들("YYYY-MM-DD")
 }
 
 interface SpecialEvent {
@@ -38,11 +40,12 @@ interface SpecialEvent {
 
 const GLOBAL_SCHEDULES_KEY = "iplan-global-schedules";
 const GLOBAL_EVENTS_KEY = "iplan-global-events";
+// 정규 스케줄을 이미 자동 시딩한 학부모 userId 목록 (학부모당 1회만 시딩 → 삭제한 스케줄이 되살아나지 않음)
+const SEEDED_USERS_KEY = "iplan-seeded-users";
 
 const DEFAULT_USERS = [
   { userId: "parent123", name: "홍길동", childName: "홍지우", academy: "태비태권도" },
   { userId: "chulsoo456", name: "김철수", childName: "김민재", academy: "아이플랜어학원" },
-  { userId: "younghee789", name: "이영희", childName: "이서연", academy: "아이플랜수학학원" },
 ];
 
 function getRegistrationData(userId: string): { name: string; childName: string; academy: string } | null {
@@ -57,8 +60,76 @@ function getRegistrationData(userId: string): { name: string; childName: string;
   }
 }
 
+// 등록 학부모 전체 목록 (회원가입 DB). 시딩의 소스로 사용한다.
+function getAllRegisteredUsers(): { userId: string; name: string; childName: string; academy: string }[] {
+  try {
+    const raw = localStorage.getItem("iplan-users");
+    return raw ? JSON.parse(raw) : DEFAULT_USERS;
+  } catch {
+    return DEFAULT_USERS;
+  }
+}
+
+// 등록된 모든 학부모의 학원 일정을 전역 저장소에 '학부모당 1회'만 시딩한다.
+// - 각 학부모의 캘린더 방문 여부와 무관하게, 학원 계정에서 자기 학원의 모든 학생이 보이도록 한다.
+// - 이미 시딩한 학부모(SEEDED_USERS_KEY)는 재시딩하지 않으므로 삭제한 정규 스케줄이 되살아나지 않는다.
+// - 전역 저장소에 직접 기록하므로 여러 번 호출(예: StrictMode)해도 결과가 동일하다(멱등).
+export function ensureSeeded(): RegularSchedule[] {
+  let global: RegularSchedule[] = [];
+  try { global = JSON.parse(localStorage.getItem(GLOBAL_SCHEDULES_KEY) ?? "[]"); } catch { global = []; }
+
+  let seededUsers: string[] = [];
+  try { seededUsers = JSON.parse(localStorage.getItem(SEEDED_USERS_KEY) ?? "[]"); } catch { seededUsers = []; }
+
+  const additions: RegularSchedule[] = [];
+  const newlySeeded: string[] = [];
+  getAllRegisteredUsers().forEach(u => {
+    if (seededUsers.includes(u.userId)) return;
+    newlySeeded.push(u.userId);
+    // 이미 전역에 일정이 있거나 시딩 정보가 부족하면 추가 일정은 만들지 않되, 시딩 완료로는 표시한다.
+    if (global.some(s => s.parentUserId === u.userId) || !u.childName || !u.academy) return;
+    const academyData = academyScheduleData[u.academy];
+    if (!academyData) return;
+    academyData.schedules.forEach((s: { dayOfWeek: number; startTime: string; endTime: string }) => {
+      additions.push({
+        ...s,
+        id: makeId(),
+        parentUserId: u.userId,
+        parentName: u.name,
+        childId: "child1",
+        childName: u.childName,
+        academyName: u.academy,
+      });
+    });
+  });
+
+  if (newlySeeded.length === 0) return global;
+
+  const updated = [...global, ...additions];
+  localStorage.setItem(GLOBAL_SCHEDULES_KEY, JSON.stringify(updated));
+  localStorage.setItem(SEEDED_USERS_KEY, JSON.stringify([...seededUsers, ...newlySeeded]));
+  return updated;
+}
+
 function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+// Date → "YYYY-MM-DD"
+function toDateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+// 저장된 일정에 고유 id가 없거나 중복되면 새로 부여한다.
+// (id가 없으면 삭제·수정이 여러 일정에 한꺼번에 적용되는 문제를 방지)
+function ensureIds<T extends { id?: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.map(item => {
+    let id = item.id;
+    if (!id || seen.has(id)) id = makeId();
+    seen.add(id);
+    return { ...item, id };
+  });
 }
 
 const COLOR_PALETTE = [
@@ -69,12 +140,10 @@ const COLOR_PALETTE = [
   { bg: "bg-violet-100/80 dark:bg-violet-900/20", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200 dark:border-violet-800" },
 ];
 
-function hashColor(key: string, isSpecial = false) {
+function hashColor(key: string) {
   const h = Math.abs(key.split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0));
-  const c = COLOR_PALETTE[h % COLOR_PALETTE.length]!;
-  return isSpecial
-    ? { bg: c.bg.replace("/80", "/25"), text: c.text, border: c.border }
-    : c;
+  // 행사·정규 스케줄 모두 동일한 배경색을 사용한다.
+  return COLOR_PALETTE[h % COLOR_PALETTE.length]!;
 }
 
 export function CalendarPage({
@@ -93,38 +162,12 @@ export function CalendarPage({
   const childrenKey = `iplan-${userId ?? "default"}-children`;
 
   // ── 전역 스케줄 (학부모·학원 공유) ──────────────────────────────
-  const [allSchedules, setAllSchedules] = useState<RegularSchedule[]>(() => {
-    const saved = localStorage.getItem(GLOBAL_SCHEDULES_KEY);
-    const global: RegularSchedule[] = saved ? JSON.parse(saved) : [];
-
-    // 학부모 첫 로그인: 등록 학원 일정 자동 시딩
-    if (!isAcademy && userId) {
-      const hasMySchedules = global.some(s => s.parentUserId === userId);
-      if (!hasMySchedules) {
-        const reg = getRegistrationData(userId);
-        if (reg?.childName && reg?.academy) {
-          const academyData = academyScheduleData[reg.academy];
-          if (academyData) {
-            const seeded: RegularSchedule[] = academyData.schedules.map((s: { dayOfWeek: number; startTime: string; endTime: string }) => ({
-              ...s,
-              id: makeId(),
-              parentUserId: userId,
-              parentName: reg.name,
-              childId: "child1",
-              childName: reg.childName,
-              academyName: reg.academy,
-            }));
-            return [...global, ...seeded];
-          }
-        }
-      }
-    }
-    return global;
-  });
+  // 등록된 모든 학부모의 학원 일정을 1회씩 시딩하여, 학원 계정에서 모든 학생이 보이도록 한다.
+  const [allSchedules, setAllSchedules] = useState<RegularSchedule[]>(() => ensureIds(ensureSeeded()));
 
   const [allEvents, setAllEvents] = useState<SpecialEvent[]>(() => {
     const saved = localStorage.getItem(GLOBAL_EVENTS_KEY);
-    return saved ? JSON.parse(saved) : [];
+    return ensureIds(saved ? JSON.parse(saved) : []);
   });
 
   // ── 학부모 전용 자녀 목록 ────────────────────────────────────────
@@ -151,11 +194,20 @@ export function CalendarPage({
   const [selectedChild, setSelectedChild] = useState<string>("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+  const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
 
   // ── localStorage 동기화 ─────────────────────────────────────────
+  // 전역 스케줄은 모든 학부모가 공유하므로, '통째로 덮어쓰기'를 하면 다른 학부모가 추가한
+  // 일정이 사라질 수 있다(lost write). 따라서 저장소의 최신값에서 '내(현재 학부모) 일정'만
+  // 교체하고 나머지는 그대로 보존한다. 학원 계정은 정규 스케줄을 변경하지 않으므로 저장하지 않는다.
   useEffect(() => {
-    localStorage.setItem(GLOBAL_SCHEDULES_KEY, JSON.stringify(allSchedules));
-  }, [allSchedules]);
+    if (isAcademy) return;
+    let stored: RegularSchedule[] = [];
+    try { stored = JSON.parse(localStorage.getItem(GLOBAL_SCHEDULES_KEY) ?? "[]"); } catch { stored = []; }
+    const others = stored.filter(s => s.parentUserId !== userId);
+    const mine = allSchedules.filter(s => s.parentUserId === userId);
+    localStorage.setItem(GLOBAL_SCHEDULES_KEY, JSON.stringify([...others, ...mine]));
+  }, [allSchedules, isAcademy, userId]);
 
   useEffect(() => {
     localStorage.setItem(GLOBAL_EVENTS_KEY, JSON.stringify(allEvents));
@@ -209,24 +261,22 @@ export function CalendarPage({
   });
 
   // ── 색상 ────────────────────────────────────────────────────────
-  const getAcademyColor = (academyName: string, isSpecialEvent = false, childId?: string) => {
+  // 행사(isSpecialEvent)와 정규 스케줄의 배경색이 일치하도록 동일한 색을 반환한다.
+  const getAcademyColor = (academyName: string, _isSpecialEvent = false, childId?: string) => {
     if (isAcademy) {
-      return hashColor(childId ?? academyName, isSpecialEvent);
+      return hashColor(childId ?? academyName);
     }
     if (childId === "child2") {
-      return isSpecialEvent
-        ? { bg: "bg-emerald-400/25", text: "text-emerald-800 dark:text-emerald-200", border: "border-emerald-400 dark:border-emerald-600" }
-        : { bg: "bg-emerald-100/80 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-800" };
+      return { bg: "bg-emerald-100/80 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-800" };
+    }
+    if (academyName.includes("아이플랜어")) {
+      return { bg: "bg-amber-100/80 dark:bg-amber-900/20", text: "text-amber-700 dark:text-amber-300", border: "border-amber-200 dark:border-amber-800" };
     }
     if (academyName.includes("멘토")) {
-      return isSpecialEvent
-        ? { bg: "bg-sky-400/25", text: "text-sky-800 dark:text-sky-200", border: "border-sky-400 dark:border-sky-600" }
-        : { bg: "bg-sky-100/80 dark:bg-sky-900/20", text: "text-sky-700 dark:text-sky-300", border: "border-sky-200 dark:border-sky-800" };
+      return { bg: "bg-sky-100/80 dark:bg-sky-900/20", text: "text-sky-700 dark:text-sky-300", border: "border-sky-200 dark:border-sky-800" };
     }
     if (academyName.includes("예종")) {
-      return isSpecialEvent
-        ? { bg: "bg-pink-400/25", text: "text-pink-800 dark:text-pink-200", border: "border-pink-400 dark:border-pink-600" }
-        : { bg: "bg-pink-500/10", text: "text-pink-700 dark:text-pink-300", border: "border-pink-200 dark:border-pink-800" };
+      return { bg: "bg-pink-500/10", text: "text-pink-700 dark:text-pink-300", border: "border-pink-200 dark:border-pink-800" };
     }
     return { bg: "bg-gray-500/10", text: "text-gray-700 dark:text-gray-300", border: "border-gray-200 dark:border-gray-800" };
   };
@@ -241,6 +291,16 @@ export function CalendarPage({
     setScheduleToEdit(schedule);
     setIsDayModalOpen(false);
     setIsEditModalOpen(true);
+  };
+
+  // 정규 스케줄 전체 삭제 (반복 일정 자체를 제거 → 학원 추가로 다시 등록 가능)
+  const handleDeleteRegularSchedule = (scheduleId: string) => {
+    const target = allSchedules.find(s => s.id === scheduleId);
+    const label = target
+      ? `${getDayOfWeekName(target.dayOfWeek)} ${target.startTime}~${target.endTime} ${target.academyName}`
+      : "";
+    if (!window.confirm(`정규 스케줄을 삭제하시겠습니까?${label ? `\n(${label})` : ""}`)) return;
+    setAllSchedules(prev => prev.filter(s => s.id !== scheduleId));
   };
 
   const handleAddAcademy = (
@@ -321,10 +381,74 @@ export function CalendarPage({
     setAllEvents(prev => [...prev, newEvent]);
   };
 
+  // 일정 확인 모달에서 "일정 추가" → 단일 일정 추가 모달 열기
+  const handleOpenAddSchedule = () => {
+    setIsDayModalOpen(false);
+    setIsAddScheduleModalOpen(true);
+  };
+
+  // 선택한 날짜에 1회성(단일) 일정 추가 → SpecialEvent로 저장
+  const handleAddSingleSchedule = (payload: {
+    childId: string;
+    academyName: string;
+    title: string;
+    startTime: string;
+    endTime: string;
+  }) => {
+    if (!selectedDate) return;
+    const date = toDateString(selectedDate);
+
+    let newEvent: SpecialEvent;
+    if (isAcademy) {
+      // 학원: childId = `${parentUserId}|${childId}`
+      const [parentUserId = "", childId = ""] = payload.childId.split("|");
+      const related = allSchedules.find(
+        s => s.parentUserId === parentUserId && s.childId === childId
+      );
+      newEvent = {
+        id: makeId(),
+        parentUserId,
+        parentName: related?.parentName ?? "",
+        childId,
+        childName: related?.childName ?? "",
+        academyName: myAcademyName ?? "",
+        date,
+        title: payload.title,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+      };
+    } else {
+      const child = children.find(c => c.id === payload.childId);
+      newEvent = {
+        id: makeId(),
+        parentUserId: userId ?? "",
+        parentName: parentDisplayName,
+        childId: payload.childId,
+        childName: child?.name ?? "",
+        academyName: payload.academyName,
+        date,
+        title: payload.title,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+      };
+    }
+    setAllEvents(prev => [...prev, newEvent]);
+  };
+
   const handleSaveSchedule = (updatedSchedule: any) => {
     if (updatedSchedule === null) {
       if (scheduleToEdit.type === "regular") {
-        setAllSchedules(prev => prev.filter(s => s.id !== scheduleToEdit.id));
+        // 정규 스케줄은 반복 일정이므로, 선택한 날짜 1회만 제외(나머지 주는 유지)
+        const dateString = selectedDate ? toDateString(selectedDate) : null;
+        if (dateString) {
+          setAllSchedules(prev =>
+            prev.map(s =>
+              s.id === scheduleToEdit.id
+                ? { ...s, excludedDates: [...(s.excludedDates ?? []), dateString] }
+                : s
+            )
+          );
+        }
       } else {
         setAllEvents(prev => prev.filter(e => e.id !== scheduleToEdit.id));
       }
@@ -343,9 +467,11 @@ export function CalendarPage({
 
   const getSchedulesForDate = (date: Date) => {
     const dayOfWeek = date.getDay();
-    const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const dateString = toDateString(date);
     return {
-      regularSchedule: filteredRegularSchedules.filter(s => s.dayOfWeek === dayOfWeek),
+      regularSchedule: filteredRegularSchedules.filter(
+        s => s.dayOfWeek === dayOfWeek && !(s.excludedDates ?? []).includes(dateString)
+      ),
       specialEvent: filteredSpecialEvents.filter(e => e.date === dateString),
     };
   };
@@ -413,7 +539,7 @@ export function CalendarPage({
       <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-card border rounded-lg p-4">
           <h3 className="mb-3">정규 스케줄</h3>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             {filteredRegularSchedules.length > 0 ? (
               [...filteredRegularSchedules]
                 .sort((a, b) => (a.dayOfWeek === 0 ? 7 : a.dayOfWeek) - (b.dayOfWeek === 0 ? 7 : b.dayOfWeek))
@@ -423,13 +549,23 @@ export function CalendarPage({
                     ? `${schedule.parentName}(${schedule.childName})`
                     : children.find(c => c.id === schedule.childId)?.name;
                   return (
-                    <div key={index} className={`flex items-center gap-2 text-sm p-2 rounded ${colors.bg}`}>
+                    <div key={schedule.id ?? index} className={`flex items-center gap-2 text-sm p-2 rounded ${colors.bg}`}>
                       <Clock className="w-4 h-4 text-muted-foreground" />
                       <span className="font-medium">{getDayOfWeekName(schedule.dayOfWeek)}</span>
                       <span className="text-muted-foreground">{schedule.startTime}~{schedule.endTime}</span>
                       {!isAcademy && <span className={colors.text}>{schedule.academyName}</span>}
                       {selectedChild === "all" && label && label !== "전체" && (
                         <span className="text-xs text-muted-foreground">({label})</span>
+                      )}
+                      {!isAcademy && (
+                        <button
+                          onClick={() => handleDeleteRegularSchedule(schedule.id)}
+                          className="ml-auto p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          aria-label="정규 스케줄 삭제"
+                          title="정규 스케줄 삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                   );
@@ -442,11 +578,10 @@ export function CalendarPage({
 
         <div className="bg-card border rounded-lg p-4">
           <h3 className="mb-3">다가오는 행사</h3>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             {filteredSpecialEvents.length > 0 ? (
               [...filteredSpecialEvents]
                 .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .slice(0, 3)
                 .map((event, index) => {
                   const colors = getAcademyColor(event.academyName, true, event.childId);
                   const [y = "0", m = "1", d = "1"] = event.date.split("-");
@@ -596,7 +731,25 @@ export function CalendarPage({
             regularSchedules={getSchedulesForDate(selectedDate).regularSchedule}
             specialEvents={getSchedulesForDate(selectedDate).specialEvent}
             onEditSchedule={handleEditSchedule}
+            onAddSchedule={handleOpenAddSchedule}
             getAcademyColor={getAcademyColor}
+          />
+          <AddScheduleModal
+            isOpen={isAddScheduleModalOpen}
+            onClose={() => setIsAddScheduleModalOpen(false)}
+            date={selectedDate}
+            isAcademy={isAcademy}
+            childOptions={
+              isAcademy
+                ? academyStudentTabs.filter(s => s.id !== "all")
+                : children.filter(c => c.id !== "all")
+            }
+            academyOptions={
+              isAcademy
+                ? [myAcademyName ?? ""]
+                : [...new Set(mySchedules.map(s => s.academyName))]
+            }
+            onSave={handleAddSingleSchedule}
           />
           {scheduleToEdit && (
             <EditScheduleModal

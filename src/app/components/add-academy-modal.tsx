@@ -11,6 +11,13 @@ interface AcademyScheduleData {
 }
 
 export const academyScheduleData: Record<string, AcademyScheduleData> = {
+  "아이플랜어학원": {
+    academyName: "아이플랜어학원",
+    schedules: [
+      { dayOfWeek: 1, startTime: "16:00", endTime: "18:00" },
+      { dayOfWeek: 4, startTime: "16:00", endTime: "18:00" },
+    ]
+  },
   "멘토학원": {
     academyName: "멘토학원",
     schedules: [
