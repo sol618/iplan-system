@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Clock, Plus } from "lucide-react";
+import { X, Clock } from "lucide-react";
 
 interface RegularSchedule {
   dayOfWeek: number;
@@ -25,7 +25,6 @@ interface DayScheduleModalProps {
   regularSchedules: RegularSchedule[];
   specialEvents: SpecialEvent[];
   onEditSchedule: (schedule: any) => void;
-  onAddSchedule: () => void;
   getAcademyColor: (academyName: string, isSpecialEvent?: boolean, childId?: string) => { bg: string; text: string; border: string };
 }
 
@@ -36,7 +35,6 @@ export function DayScheduleModal({
   regularSchedules,
   specialEvents,
   onEditSchedule,
-  onAddSchedule,
   getAcademyColor,
 }: DayScheduleModalProps) {
   if (!isOpen) return null;
@@ -124,14 +122,6 @@ export function DayScheduleModal({
               })}
             </div>
           )}
-
-          <button
-            onClick={onAddSchedule}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-4 h-4" />
-            <span>일정 추가</span>
-          </button>
         </div>
       </div>
     </div>

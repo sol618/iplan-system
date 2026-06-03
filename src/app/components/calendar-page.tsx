@@ -4,7 +4,6 @@ import { DayScheduleModal } from "./day-schedule-modal";
 import { EditScheduleModal } from "./edit-schedule-modal";
 import { AddAcademyModal, academyScheduleData } from "./add-academy-modal";
 import { AddEventModal } from "./add-event-modal";
-import { AddScheduleModal } from "./add-schedule-modal";
 
 interface Child {
   id: string;
@@ -22,6 +21,9 @@ interface RegularSchedule {
   startTime: string;
   endTime: string;
   excludedDates?: string[]; // 이 반복 일정에서 1회 삭제된 날짜들("YYYY-MM-DD")
+  // 이 반복 일정에서 특정 날짜 1회만 수정된 값들("YYYY-MM-DD" → 덮어쓸 필드)
+  // → 정규 수업을 특정 날짜에 수정해도 해당 날짜만 바뀌고 나머지 주는 원래 시간 유지
+  overrides?: Record<string, { startTime?: string; endTime?: string; academyName?: string; childId?: string; childName?: string }>;
 }
 
 interface SpecialEvent {
@@ -132,6 +134,26 @@ function ensureIds<T extends { id?: string }>(items: T[]): T[] {
   });
 }
 
+// 동일한 학생의 동일한 수업이 서로 다른 childId/id로 중복 저장된 경우 하나로 합친다.
+// (예: 시딩으로 생긴 정규 스케줄과 학부모가 '새 자녀 추가'로 같은 자녀를 다시 등록해 생긴 스케줄)
+// → 학원 캘린더에서 같은 학생이 두 번 보이는 문제를 방지한다. 제외 날짜(excludedDates)는 병합한다.
+function dedupeSchedules(schedules: RegularSchedule[]): RegularSchedule[] {
+  const byKey = new Map<string, RegularSchedule>();
+  for (const s of schedules) {
+    const key = `${s.parentUserId}|${s.parentName}|${s.childName}|${s.academyName}|${s.dayOfWeek}|${s.startTime}|${s.endTime}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.excludedDates = [...new Set([...(existing.excludedDates ?? []), ...(s.excludedDates ?? [])])];
+      if (existing.overrides || s.overrides) {
+        existing.overrides = { ...(s.overrides ?? {}), ...(existing.overrides ?? {}) };
+      }
+    } else {
+      byKey.set(key, { ...s });
+    }
+  }
+  return [...byKey.values()];
+}
+
 const COLOR_PALETTE = [
   { bg: "bg-sky-100/80 dark:bg-sky-900/20",     text: "text-sky-700 dark:text-sky-300",     border: "border-sky-200 dark:border-sky-800" },
   { bg: "bg-pink-500/10",                        text: "text-pink-700 dark:text-pink-300",   border: "border-pink-200 dark:border-pink-800" },
@@ -163,7 +185,7 @@ export function CalendarPage({
 
   // ── 전역 스케줄 (학부모·학원 공유) ──────────────────────────────
   // 등록된 모든 학부모의 학원 일정을 1회씩 시딩하여, 학원 계정에서 모든 학생이 보이도록 한다.
-  const [allSchedules, setAllSchedules] = useState<RegularSchedule[]>(() => ensureIds(ensureSeeded()));
+  const [allSchedules, setAllSchedules] = useState<RegularSchedule[]>(() => ensureIds(dedupeSchedules(ensureSeeded())));
 
   const [allEvents, setAllEvents] = useState<SpecialEvent[]>(() => {
     const saved = localStorage.getItem(GLOBAL_EVENTS_KEY);
@@ -194,14 +216,19 @@ export function CalendarPage({
   const [selectedChild, setSelectedChild] = useState<string>("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
-  const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
 
   // ── localStorage 동기화 ─────────────────────────────────────────
   // 전역 스케줄은 모든 학부모가 공유하므로, '통째로 덮어쓰기'를 하면 다른 학부모가 추가한
   // 일정이 사라질 수 있다(lost write). 따라서 저장소의 최신값에서 '내(현재 학부모) 일정'만
-  // 교체하고 나머지는 그대로 보존한다. 학원 계정은 정규 스케줄을 변경하지 않으므로 저장하지 않는다.
+  // 교체하고 나머지는 그대로 보존한다.
+  // 학원 계정도 정규 스케줄을 변경(삭제·수정)할 수 있으므로 반드시 저장해야 한다. 저장하지 않으면
+  // 학원에서 삭제한 일정이 전역 저장소에 반영되지 않아 부모 계정에서 그대로 보이는 문제가 생긴다.
+  // 학원 계정은 전역 스케줄 전체를 메모리에 들고 있으므로(allSchedules) 통째로 기록한다.
   useEffect(() => {
-    if (isAcademy) return;
+    if (isAcademy) {
+      localStorage.setItem(GLOBAL_SCHEDULES_KEY, JSON.stringify(allSchedules));
+      return;
+    }
     let stored: RegularSchedule[] = [];
     try { stored = JSON.parse(localStorage.getItem(GLOBAL_SCHEDULES_KEY) ?? "[]"); } catch { stored = []; }
     const others = stored.filter(s => s.parentUserId !== userId);
@@ -296,8 +323,9 @@ export function CalendarPage({
   // 정규 스케줄 전체 삭제 (반복 일정 자체를 제거 → 학원 추가로 다시 등록 가능)
   const handleDeleteRegularSchedule = (scheduleId: string) => {
     const target = allSchedules.find(s => s.id === scheduleId);
+    const who = target ? (isAcademy ? `${target.parentName}(${target.childName}) ` : "") : "";
     const label = target
-      ? `${getDayOfWeekName(target.dayOfWeek)} ${target.startTime}~${target.endTime} ${target.academyName}`
+      ? `${who}${getDayOfWeekName(target.dayOfWeek)} ${target.startTime}~${target.endTime} ${target.academyName}`
       : "";
     if (!window.confirm(`정규 스케줄을 삭제하시겠습니까?${label ? `\n(${label})` : ""}`)) return;
     setAllSchedules(prev => prev.filter(s => s.id !== scheduleId));
@@ -381,60 +409,6 @@ export function CalendarPage({
     setAllEvents(prev => [...prev, newEvent]);
   };
 
-  // 일정 확인 모달에서 "일정 추가" → 단일 일정 추가 모달 열기
-  const handleOpenAddSchedule = () => {
-    setIsDayModalOpen(false);
-    setIsAddScheduleModalOpen(true);
-  };
-
-  // 선택한 날짜에 1회성(단일) 일정 추가 → SpecialEvent로 저장
-  const handleAddSingleSchedule = (payload: {
-    childId: string;
-    academyName: string;
-    title: string;
-    startTime: string;
-    endTime: string;
-  }) => {
-    if (!selectedDate) return;
-    const date = toDateString(selectedDate);
-
-    let newEvent: SpecialEvent;
-    if (isAcademy) {
-      // 학원: childId = `${parentUserId}|${childId}`
-      const [parentUserId = "", childId = ""] = payload.childId.split("|");
-      const related = allSchedules.find(
-        s => s.parentUserId === parentUserId && s.childId === childId
-      );
-      newEvent = {
-        id: makeId(),
-        parentUserId,
-        parentName: related?.parentName ?? "",
-        childId,
-        childName: related?.childName ?? "",
-        academyName: myAcademyName ?? "",
-        date,
-        title: payload.title,
-        startTime: payload.startTime,
-        endTime: payload.endTime,
-      };
-    } else {
-      const child = children.find(c => c.id === payload.childId);
-      newEvent = {
-        id: makeId(),
-        parentUserId: userId ?? "",
-        parentName: parentDisplayName,
-        childId: payload.childId,
-        childName: child?.name ?? "",
-        academyName: payload.academyName,
-        date,
-        title: payload.title,
-        startTime: payload.startTime,
-        endTime: payload.endTime,
-      };
-    }
-    setAllEvents(prev => [...prev, newEvent]);
-  };
-
   const handleSaveSchedule = (updatedSchedule: any) => {
     if (updatedSchedule === null) {
       if (scheduleToEdit.type === "regular") {
@@ -454,9 +428,29 @@ export function CalendarPage({
       }
     } else {
       if (updatedSchedule.type === "regular") {
-        setAllSchedules(prev =>
-          prev.map(s => s.id === scheduleToEdit.id ? { ...s, ...updatedSchedule } : s)
-        );
+        // 정규 스케줄은 반복 일정이므로, 선택한 날짜 1회만 수정값을 덮어쓴다(나머지 주는 원래 시간 유지).
+        const dateString = selectedDate ? toDateString(selectedDate) : null;
+        if (dateString) {
+          setAllSchedules(prev =>
+            prev.map(s =>
+              s.id === scheduleToEdit.id
+                ? {
+                    ...s,
+                    overrides: {
+                      ...(s.overrides ?? {}),
+                      [dateString]: {
+                        startTime: updatedSchedule.startTime,
+                        endTime: updatedSchedule.endTime,
+                        academyName: updatedSchedule.academyName,
+                        childId: updatedSchedule.childId,
+                        childName: updatedSchedule.childName,
+                      },
+                    },
+                  }
+                : s
+            )
+          );
+        }
       } else {
         setAllEvents(prev =>
           prev.map(e => e.id === scheduleToEdit.id ? { ...e, ...updatedSchedule } : e)
@@ -469,9 +463,13 @@ export function CalendarPage({
     const dayOfWeek = date.getDay();
     const dateString = toDateString(date);
     return {
-      regularSchedule: filteredRegularSchedules.filter(
-        s => s.dayOfWeek === dayOfWeek && !(s.excludedDates ?? []).includes(dateString)
-      ),
+      // 해당 날짜에 1회 수정(override)된 정규 스케줄은 그 날짜에 한해 수정값으로 표시한다.
+      regularSchedule: filteredRegularSchedules
+        .filter(s => s.dayOfWeek === dayOfWeek && !(s.excludedDates ?? []).includes(dateString))
+        .map(s => {
+          const ov = s.overrides?.[dateString];
+          return ov ? { ...s, ...ov } : s;
+        }),
       specialEvent: filteredSpecialEvents.filter(e => e.date === dateString),
     };
   };
@@ -557,16 +555,14 @@ export function CalendarPage({
                       {selectedChild === "all" && label && label !== "전체" && (
                         <span className="text-xs text-muted-foreground">({label})</span>
                       )}
-                      {!isAcademy && (
-                        <button
-                          onClick={() => handleDeleteRegularSchedule(schedule.id)}
-                          className="ml-auto p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          aria-label="정규 스케줄 삭제"
-                          title="정규 스케줄 삭제"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDeleteRegularSchedule(schedule.id)}
+                        className="ml-auto p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        aria-label="정규 스케줄 삭제"
+                        title="정규 스케줄 삭제"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   );
                 })
@@ -731,25 +727,7 @@ export function CalendarPage({
             regularSchedules={getSchedulesForDate(selectedDate).regularSchedule}
             specialEvents={getSchedulesForDate(selectedDate).specialEvent}
             onEditSchedule={handleEditSchedule}
-            onAddSchedule={handleOpenAddSchedule}
             getAcademyColor={getAcademyColor}
-          />
-          <AddScheduleModal
-            isOpen={isAddScheduleModalOpen}
-            onClose={() => setIsAddScheduleModalOpen(false)}
-            date={selectedDate}
-            isAcademy={isAcademy}
-            childOptions={
-              isAcademy
-                ? academyStudentTabs.filter(s => s.id !== "all")
-                : children.filter(c => c.id !== "all")
-            }
-            academyOptions={
-              isAcademy
-                ? [myAcademyName ?? ""]
-                : [...new Set(mySchedules.map(s => s.academyName))]
-            }
-            onSave={handleAddSingleSchedule}
           />
           {scheduleToEdit && (
             <EditScheduleModal
