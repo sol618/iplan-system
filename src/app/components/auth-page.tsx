@@ -692,8 +692,8 @@ function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "acade
     if (!academyAddrInput.value.trim()) {
       acadCurrentErrors.academyAddress = "주소를 입력해 주세요.";
       acadValid = false;
-    } else if (academyAddrInput.value.trim().length < 5) {
-      acadCurrentErrors.academyAddress = "주소는 최소 5글자 이상 입력해 주세요.";
+    } else if (academyAddrInput.value.trim().length < 6) {
+      acadCurrentErrors.academyAddress = "주소는 최소 6글자 이상 입력해 주세요.";
       acadValid = false;
     } else if (/[ㄱ-ㅎㅏ-ㅣ]/.test(academyAddrInput.value)) {
       // 자모 단독 입력(ㅇㅇ 등) 거부 — 등록자 이름과 동일한 범위 조건
@@ -948,6 +948,7 @@ function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "acade
                 id="academyPhone"
                 type="tel"
                 placeholder="02-1234-5678"
+                maxLength={11}
                 onInput={() => handleAcadInputChange("academyPhone")}
                 className={`w-full px-5 py-4 text-lg bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-all ${acadErrors.academyPhone ? "border-destructive focus:ring-destructive" : "border-border focus:ring-ring"}`}
               />
