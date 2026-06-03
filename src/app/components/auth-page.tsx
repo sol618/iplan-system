@@ -162,8 +162,9 @@ function ParentAuthForm({
       isValid = false;
     }
 
-    // 3. 아이디 검증 (기존 미입력/자릿수/형식/중복 검사 통합)
-    const MOCK_DUPLICATE_IDS = ["admin123", "test123", "user123", "iplan123"];
+    // 3. 학부모 아이디 검증 (기존 미입력/자릿수/형식/중복 검사 통합)
+    const MOCK_DUPLICATE_IDS = ["parent123", "chulsoo456", "jimin123", "sooa456", 
+      'academy123', 'mentor123', 'yejong123', 'english456'];
     const existingUsers = getParentUsers();
     if (!userIdInput.value.trim()) {
       currentErrors.userId = "아이디를 입력해 주세요.";
@@ -767,7 +768,9 @@ function AcademyRegistrationForm({onLogin}:{onLogin:(userType: "parent" | "acade
       isValid = false;
     }
 
-    const MOCK_DUPLICATE_IDS = ["admin123", "test1234", "user123", "iplan123", "admin123", "test123", "manager1", "academy1"];
+    //학원 아이디 검증
+    const MOCK_DUPLICATE_IDS = ["parent123", "chulsoo456", "jimin123", "sooa456", 'academy123', 
+      'mentor123', 'yejong123', 'english456'];
     if (!managerIdInput.value.trim()) {
       currentErrors.managerId = "아이디를 입력해 주세요.";
       isValid = false;
