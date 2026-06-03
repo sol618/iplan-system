@@ -21,6 +21,9 @@ interface RegularSchedule {
   startTime: string;
   endTime: string;
   excludedDates?: string[]; // 이 반복 일정에서 1회 삭제된 날짜들("YYYY-MM-DD")
+  // 이 반복 일정에서 특정 날짜 1회만 수정된 값들("YYYY-MM-DD" → 덮어쓸 필드)
+  // → 정규 수업을 특정 날짜에 수정해도 해당 날짜만 바뀌고 나머지 주는 원래 시간 유지
+  overrides?: Record<string, { startTime?: string; endTime?: string; academyName?: string; childId?: string; childName?: string }>;
 }
 
 interface SpecialEvent {
@@ -140,8 +143,10 @@ function dedupeSchedules(schedules: RegularSchedule[]): RegularSchedule[] {
     const key = `${s.parentUserId}|${s.parentName}|${s.childName}|${s.academyName}|${s.dayOfWeek}|${s.startTime}|${s.endTime}`;
     const existing = byKey.get(key);
     if (existing) {
-      const mergedExcluded = [...new Set([...(existing.excludedDates ?? []), ...(s.excludedDates ?? [])])];
-      existing.excludedDates = mergedExcluded;
+      existing.excludedDates = [...new Set([...(existing.excludedDates ?? []), ...(s.excludedDates ?? [])])];
+      if (existing.overrides || s.overrides) {
+        existing.overrides = { ...(s.overrides ?? {}), ...(existing.overrides ?? {}) };
+      }
     } else {
       byKey.set(key, { ...s });
     }
@@ -423,9 +428,29 @@ export function CalendarPage({
       }
     } else {
       if (updatedSchedule.type === "regular") {
-        setAllSchedules(prev =>
-          prev.map(s => s.id === scheduleToEdit.id ? { ...s, ...updatedSchedule } : s)
-        );
+        // 정규 스케줄은 반복 일정이므로, 선택한 날짜 1회만 수정값을 덮어쓴다(나머지 주는 원래 시간 유지).
+        const dateString = selectedDate ? toDateString(selectedDate) : null;
+        if (dateString) {
+          setAllSchedules(prev =>
+            prev.map(s =>
+              s.id === scheduleToEdit.id
+                ? {
+                    ...s,
+                    overrides: {
+                      ...(s.overrides ?? {}),
+                      [dateString]: {
+                        startTime: updatedSchedule.startTime,
+                        endTime: updatedSchedule.endTime,
+                        academyName: updatedSchedule.academyName,
+                        childId: updatedSchedule.childId,
+                        childName: updatedSchedule.childName,
+                      },
+                    },
+                  }
+                : s
+            )
+          );
+        }
       } else {
         setAllEvents(prev =>
           prev.map(e => e.id === scheduleToEdit.id ? { ...e, ...updatedSchedule } : e)
@@ -438,9 +463,13 @@ export function CalendarPage({
     const dayOfWeek = date.getDay();
     const dateString = toDateString(date);
     return {
-      regularSchedule: filteredRegularSchedules.filter(
-        s => s.dayOfWeek === dayOfWeek && !(s.excludedDates ?? []).includes(dateString)
-      ),
+      // 해당 날짜에 1회 수정(override)된 정규 스케줄은 그 날짜에 한해 수정값으로 표시한다.
+      regularSchedule: filteredRegularSchedules
+        .filter(s => s.dayOfWeek === dayOfWeek && !(s.excludedDates ?? []).includes(dateString))
+        .map(s => {
+          const ov = s.overrides?.[dateString];
+          return ov ? { ...s, ...ov } : s;
+        }),
       specialEvent: filteredSpecialEvents.filter(e => e.date === dateString),
     };
   };
